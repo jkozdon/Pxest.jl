@@ -122,7 +122,7 @@ function pxest_connectivity_destroy(conn)
   ccall(PXEST_CONNECTIVITY_DESTROY, Void, (Ptr{Void},), conn)
 end
 
-struct Connectivity
+mutable struct Connectivity
   # the number of vertices that define the \a embedding of the forest (not the
   # topology)
   num_vertices::pxest_topidx_t
@@ -158,7 +158,19 @@ struct Connectivity
                            (3, Int(num_vertices)), false)
     tree_to_vertex = unsafe_wrap(Array{pxest_topidx_t, 2}, C.tree_to_vertex,
                                  (PXEST_CHILDREN, Int(num_trees)), false)
-    return new(num_vertices, num_trees, vertices, tree_to_vertex,
+    this = new(num_vertices, num_trees, vertices, tree_to_vertex,
                pxest_conn_ptr)
+    finalizer(this, connectivity_destroy)
+    return this
   end
 end
+
+function connectivity_destroy(conn)
+  pxest_connectivity_destroy(conn.pxest_conn_ptr)
+  conn.pxest_conn_ptr = C_NULL
+  conn.num_vertices = 0
+  conn.num_trees = 0
+  conn.vertices = zeros(Cdouble, 0,0)
+  conn.tree_to_vertex = zeros(pxest_topidx_t, 0,0)
+end
+
