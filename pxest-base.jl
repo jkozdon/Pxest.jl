@@ -1,3 +1,5 @@
+using MPI
+
 # Path to the library
 const libsc =
   "/Users/jekozdon/codes/p4est_julia/p4est/local/lib/libsc.dylib"
@@ -10,6 +12,8 @@ const libpxest =
     :PXEST_CONNECTIVITY_READ_INP   => "p4est_connectivity_read_inp",
     :PXEST_CONNECTIVITY_NEW_BYNAME => "p4est_connectivity_new_byname",
     :PXEST_CONNECTIVITY_DESTROY    => "p4est_connectivity_destroy",
+    :PXEST_NEW_EXT                 => "p4est_new_ext",
+    :PXEST_DESTROY                 => "p4est_destroy",
    )
 
 @p8est const _pxest_functions = Dict{Symbol, String}(
@@ -17,6 +21,8 @@ const libpxest =
     :PXEST_CONNECTIVITY_READ_INP   => "p8est_connectivity_read_inp",
     :PXEST_CONNECTIVITY_NEW_BYNAME => "p8est_connectivity_new_byname",
     :PXEST_CONNECTIVITY_DESTROY    => "p8est_connectivity_destroy",
+    :PXEST_NEW_EXT                 => "p8est_new_ext",
+    :PXEST_DESTROY                 => "p8est_destroy",
    )
 
 # Build symbols
@@ -41,6 +47,7 @@ end
 
 # Connectivity data structures
 const pxest_topidx_t = Int32
+const pxest_locidx_t = Int32
 struct pxest_connectivity_t
   # the number of vertices that define the \a embedding of the forest (not the
   # topology)
@@ -175,3 +182,26 @@ function connectivity_destroy(conn)
   conn.tree_to_vertex = zeros(pxest_topidx_t, 0,0)
 end
 
+struct pxest_t
+end
+
+mutable struct PXEST
+  pxest_ptr::Ptr{Void}
+
+  function PXEST(conn ;mpicomm=MPI.COMM_WORLD, min_lvl = 0)
+    pxest = ccall(PXEST_NEW_EXT, Ptr{Void},
+                  (MPI.CComm, Ptr{pxest_connectivity_t}, pxest_locidx_t,
+                   Cint, Cint, Csize_t, Ptr{Void}, Ptr{Void}),
+                  MPI.CComm(mpicomm), conn.pxest_conn_ptr, 0, min_lvl, 1, 0,
+                  C_NULL, C_NULL)
+
+    this = new(pxest)
+    finalizer(this, pxest_destroy)
+    return this
+  end
+end
+
+function pxest_destroy(pxest)
+  ccall(PXEST_DESTROY, Void, (Ptr{Void},), pxest.pxest_ptr)
+  pxest.pxest_ptr = C_NULL
+end
