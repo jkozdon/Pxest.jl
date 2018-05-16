@@ -113,7 +113,8 @@ end
         (Cint, Cint, Cint, Cint), nx, ny, px, py)
 end
 
-@p8est function pxest_connectivity_new_brick(nx, ny, nz; px=false, py=false, pz=false)
+@p8est function pxest_connectivity_new_brick(nx, ny, nz;
+                                             px=false, py=false, pz=false)
   ccall(PXEST_CONNECTIVITY_NEW_BRICK, Ptr{pxest_connectivity_t},
         (Cint, Cint, Cint, Cint, Cint, Cint), nx, ny, nz, px, py, pz)
 end
