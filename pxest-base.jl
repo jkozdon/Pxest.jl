@@ -8,25 +8,37 @@ const libpxest =
 
 # Functions to load
 @p4est const _pxest_functions = Dict{Symbol, String}(
-    :PXEST_CONNECTIVITY_NEW_BRICK  => "p4est_connectivity_new_brick",
-    :PXEST_CONNECTIVITY_READ_INP   => "p4est_connectivity_read_inp",
-    :PXEST_CONNECTIVITY_NEW_BYNAME => "p4est_connectivity_new_byname",
-    :PXEST_CONNECTIVITY_DESTROY    => "p4est_connectivity_destroy",
-    :PXEST_NEW_EXT                 => "p4est_new_ext",
-    :PXEST_DESTROY                 => "p4est_destroy",
-    :PXEST_BALANCE_EXT             => "p4est_balance_ext",
-    :PXEST_PARTITION               => "p4est_partition",
+    :PXEST_CONNECTIVITY_NEW_BRICK     => "p4est_connectivity_new_brick",
+    :PXEST_CONNECTIVITY_READ_INP      => "p4est_connectivity_read_inp",
+    :PXEST_CONNECTIVITY_NEW_BYNAME    => "p4est_connectivity_new_byname",
+    :PXEST_CONNECTIVITY_DESTROY       => "p4est_connectivity_destroy",
+    :PXEST_NEW_EXT                    => "p4est_new_ext",
+    :PXEST_DESTROY                    => "p4est_destroy",
+    :PXEST_BALANCE_EXT                => "p4est_balance_ext",
+    :PXEST_PARTITION                  => "p4est_partition",
+    :PXEST_VTK_CONTEXT_NEW            => "p4est_vtk_context_new",
+    :PXEST_VTK_CONTEXT_SET_SCALE      => "p4est_vtk_context_set_scale",
+    :PXEST_VTK_CONTEXT_SET_CONTINUOUS => "p4est_vtk_context_set_continuous",
+    :PXEST_VTK_WRITE_HEADER           => "p4est_vtk_write_header",
+    :PXEST_VTK_WRITE_CELL_DATAF       => "p4est_vtk_write_cell_dataf",
+    :PXEST_VTK_WRITE_FOOTER           => "p4est_vtk_write_footer",
    )
 
 @p8est const _pxest_functions = Dict{Symbol, String}(
-    :PXEST_CONNECTIVITY_NEW_BRICK  => "p8est_connectivity_new_brick",
-    :PXEST_CONNECTIVITY_READ_INP   => "p8est_connectivity_read_inp",
-    :PXEST_CONNECTIVITY_NEW_BYNAME => "p8est_connectivity_new_byname",
-    :PXEST_CONNECTIVITY_DESTROY    => "p8est_connectivity_destroy",
-    :PXEST_NEW_EXT                 => "p8est_new_ext",
-    :PXEST_DESTROY                 => "p8est_destroy",
-    :PXEST_BALANCE_EXT             => "p8est_balance_ext",
-    :PXEST_PARTITION               => "p8est_partition",
+    :PXEST_CONNECTIVITY_NEW_BRICK     => "p8est_connectivity_new_brick",
+    :PXEST_CONNECTIVITY_READ_INP      => "p8est_connectivity_read_inp",
+    :PXEST_CONNECTIVITY_NEW_BYNAME    => "p8est_connectivity_new_byname",
+    :PXEST_CONNECTIVITY_DESTROY       => "p8est_connectivity_destroy",
+    :PXEST_NEW_EXT                    => "p8est_new_ext",
+    :PXEST_DESTROY                    => "p8est_destroy",
+    :PXEST_BALANCE_EXT                => "p8est_balance_ext",
+    :PXEST_PARTITION                  => "p8est_partition",
+    :PXEST_VTK_CONTEXT_NEW            => "p8est_vtk_context_new",
+    :PXEST_VTK_CONTEXT_SET_SCALE      => "p8est_vtk_context_set_scale",
+    :PXEST_VTK_CONTEXT_SET_CONTINUOUS => "p8est_vtk_context_set_continuous",
+    :PXEST_VTK_WRITE_HEADER           => "p8est_vtk_write_header",
+    :PXEST_VTK_WRITE_CELL_DATAF       => "p8est_vtk_write_cell_dataf",
+    :PXEST_VTK_WRITE_FOOTER           => "p8est_vtk_write_footer",
    )
 
 # Build symbols
@@ -294,5 +306,27 @@ end
 function partition(pxest; allow_for_coarsening=true)
   ccall(PXEST_PARTITION, Void, (Ptr{pxest_t}, Cint , Ptr{Void}),
         pxest.pxest_ptr, allow_for_coarsening, C_NULL)
+end
+#}}}
+
+#{{{vtk
+function vtk_write_file(pxest, fn; scale = 1)
+  cont = ccall(PXEST_VTK_CONTEXT_NEW, Ptr{Void}, (Ptr{pxest_t}, Ptr{Cchar},),
+               pxest.pxest_ptr, fn)
+
+  ccall(PXEST_VTK_CONTEXT_SET_SCALE, Void, (Ptr{Void}, Cdouble), cont, scale)
+
+  ccall(PXEST_VTK_CONTEXT_SET_CONTINUOUS, Void, (Ptr{Void}, Cint), cont, 1)
+
+  cont = ccall(PXEST_VTK_WRITE_HEADER, Ptr{Void}, (Ptr{Void},), cont)
+  cont == C_NULL ? error(string(fn, "_vtk: Error writing header")) : nothing
+
+  cont = ccall(PXEST_VTK_WRITE_CELL_DATAF, Ptr{Void},
+               (Ptr{Void}, Cint, Cint, Cint, Cint, Cint, Cint, Ptr{Void}...),
+               cont, 1, 1, 1, 0, 0, 0, cont)
+  cont == C_NULL ? error(string(fn, "_vtk: Error writing cell data")) : nothing
+
+  retval = ccall(PXEST_VTK_WRITE_FOOTER, Cint, (Ptr{Void},), cont)
+  retval != 0 ? error(string(fn, "_vtk: Error writing footer")) : nothing;
 end
 #}}}
