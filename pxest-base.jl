@@ -2,9 +2,9 @@ using MPI
 
 # Path to the library
 const libsc =
-  "/Users/jekozdon/codes/p4est_julia/p4est/local/lib/libsc.dylib"
+  "p4est/local/lib/libsc.dylib"
 const libpxest =
-  "/Users/jekozdon/codes/p4est_julia/p4est/local/lib/libp4est.dylib"
+  "p4est/local/lib/libp4est.dylib"
 
 # Functions to load
 @p4est const _pxest_functions = Dict{Symbol, String}(
