@@ -187,6 +187,7 @@ end
 
 mutable struct PXEST
   pxest_ptr::Ptr{Void}
+  conn::Connectivity
 
   function PXEST(conn ;mpicomm=MPI.COMM_WORLD, min_lvl = 0)
     pxest = ccall(PXEST_NEW_EXT, Ptr{Void},
@@ -195,7 +196,7 @@ mutable struct PXEST
                   MPI.CComm(mpicomm), conn.pxest_conn_ptr, 0, min_lvl, 1, 0,
                   C_NULL, C_NULL)
 
-    this = new(pxest)
+    this = new(pxest, conn)
     finalizer(this, pxest_destroy)
     return this
   end
