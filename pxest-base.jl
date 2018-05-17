@@ -14,6 +14,8 @@ const libpxest =
     :PXEST_CONNECTIVITY_DESTROY    => "p4est_connectivity_destroy",
     :PXEST_NEW_EXT                 => "p4est_new_ext",
     :PXEST_DESTROY                 => "p4est_destroy",
+    :PXEST_BALANCE_EXT             => "p4est_balance_ext",
+    :PXEST_PARTITION               => "p4est_partition",
    )
 
 @p8est const _pxest_functions = Dict{Symbol, String}(
@@ -23,6 +25,8 @@ const libpxest =
     :PXEST_CONNECTIVITY_DESTROY    => "p8est_connectivity_destroy",
     :PXEST_NEW_EXT                 => "p8est_new_ext",
     :PXEST_DESTROY                 => "p8est_destroy",
+    :PXEST_BALANCE_EXT             => "p8est_balance_ext",
+    :PXEST_PARTITION               => "p8est_partition",
    )
 
 # Build symbols
@@ -41,13 +45,30 @@ function __init__()
 
 end
 
-#
+#{{{ p4est constants and types
 @p4est const PXEST_CHILDREN = 4
 @p8est const PXEST_CHILDREN = 8
 
 # Connectivity data structures
 const pxest_topidx_t = Int32
 const pxest_locidx_t = Int32
+const pxest_gloidx_t = Int64
+const pxest_quadrant_t = Void
+const sc_array_t = Void
+const sc_mempool_t = Void
+const pxest_inspect_t = Void
+const pxest_connect_type_t = Cuint
+@p4est const PXEST_CONNECT_FACE = pxest_connect_type_t(21)
+@p4est const PXEST_CONNECT_CORNER = pxest_connect_type_t(22)
+
+@p8est const PXEST_CONNECT_FACE = pxest_connect_type_t(31)
+@p8est const PXEST_CONNECT_EDGE = pxest_connect_type_t(32)
+@p8est const PXEST_CONNECT_CORNER = pxest_connect_type_t(33)
+
+const PXEST_CONNECT_FULL = PXEST_CONNECT_CORNER
+#}}}
+
+#{{{ connectivity
 struct pxest_connectivity_t
   # the number of vertices that define the \a embedding of the forest (not the
   # topology)
@@ -181,12 +202,69 @@ function connectivity_destroy(conn)
   conn.vertices = zeros(Cdouble, 0,0)
   conn.tree_to_vertex = zeros(pxest_topidx_t, 0,0)
 end
+#}}}
 
+#{{{ pxest data structure
 struct pxest_t
+  # MPI communicator
+  mpicomm::MPI.CComm
+
+  # number of MPI processes
+  mpisize::Cint
+
+  # this process's MPI rank
+  mpirank::Cint
+
+  # flag if communicator is owned
+  mpicomm_owned::Cint
+
+  # size of per-quadrant p.user_data (see
+  # p4est_quadrant_t::p4est_quadrant_data::user_data)
+  data_size::Csize_t
+
+  # convenience pointer for users, never touched by p4est
+  user_pointer::Ptr{Void}
+
+  # Gets bumped on mesh change
+  revision::Clong
+
+  # 0-based index of first local tree, must be -1 for an empty processor
+  first_local_tree::pxest_topidx_t
+
+  # 0-based index of last local tree, must be -2 for an empty processor
+  last_local_tree::pxest_topidx_t
+
+  # number of quadrants on all trees on this processor
+  local_num_quadrants::pxest_locidx_t
+
+  # number of quadrants on all trees on all processors
+  global_num_quadrants::pxest_gloidx_t
+
+  # first global quadrant index for each process and 1 beyond
+  global_first_quadrant::Ptr{pxest_gloidx_t}
+
+  # first smallest possible quad for each process and 1 beyond
+  global_first_position::Ptr{pxest_quadrant_t}
+
+  # connectivity structure, not owned
+  connectivity::Ptr{pxest_connectivity_t}
+
+  # array of all trees
+  trees::Ptr{sc_array_t}
+
+  # memory allocator for user data
+  #   WARNING: This is NULL if data size equals zero.
+  user_data_pool::Ptr{sc_mempool_t}
+
+  # memory allocator for temporary quadrants
+  quadrant_pool::Ptr{sc_mempool_t}
+
+  # algorithmic switches
+  inspect::Ptr{pxest_inspect_t}
 end
 
 mutable struct PXEST
-  pxest_ptr::Ptr{Void}
+  pxest_ptr::Ptr{pxest_t}
   conn::Connectivity
 
   function PXEST(conn ;mpicomm=MPI.COMM_WORLD, min_lvl = 0)
@@ -206,3 +284,15 @@ function pxest_destroy(pxest)
   ccall(PXEST_DESTROY, Void, (Ptr{Void},), pxest.pxest_ptr)
   pxest.pxest_ptr = C_NULL
 end
+
+function balance(pxest; connect = PXEST_CONNECT_FULL)
+  ccall(PXEST_BALANCE_EXT, Void,
+        (Ptr{pxest_t}, pxest_connect_type_t, Ptr{Void}, Ptr{Void}),
+        pxest.pxest_ptr, connect, C_NULL, C_NULL)
+end
+
+function partition(pxest; allow_for_coarsening=true)
+  ccall(PXEST_PARTITION, Void, (Ptr{pxest_t}, Cint , Ptr{Void}),
+        pxest.pxest_ptr, allow_for_coarsening, C_NULL)
+end
+#}}}
