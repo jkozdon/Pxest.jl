@@ -67,7 +67,7 @@ end
 const pxest_topidx_t = Int32
 const pxest_locidx_t = Int32
 const pxest_gloidx_t = Int64
-const pxest_quadrant_t = Void
+const pxest_qcoord_t = Int32
 const sc_array_t = Void
 const sc_mempool_t = Void
 const pxest_inspect_t = Void
@@ -219,6 +219,27 @@ end
 #}}}
 
 #{{{ pxest data structure
+const piggy_size = max(sizeof(Ptr{Void}),
+                       sizeof(Clong),
+                       sizeof(Cint),
+                       sizeof(pxest_topidx_t),
+                       sizeof(pxest_topidx_t) + sizeof(Cint),
+                       sizeof(pxest_topidx_t) + sizeof(pxest_topidx_t),
+                       sizeof(pxest_topidx_t) + sizeof(pxest_locidx_t))
+
+struct pxest_quadrant_t
+  # coordinates
+  x::pxest_qcoord_t
+  y::pxest_qcoord_t
+
+  level::Int8    # level of refinement
+  pad8::Int8     # padding
+  pad16::Int16    # padding
+
+  # TODO: Figure out how to handle this better (How to cast?)
+  piggy_data::NTuple{piggy_size, Cchar}
+end
+
 struct pxest_t
   # MPI communicator
   mpicomm::MPI.CComm
