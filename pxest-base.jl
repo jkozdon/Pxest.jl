@@ -16,6 +16,7 @@ const libpxest =
     :PXEST_DESTROY                    => "p4est_destroy",
     :PXEST_BALANCE_EXT                => "p4est_balance_ext",
     :PXEST_PARTITION                  => "p4est_partition",
+    :PXEST_REFINE_EXT                 => "p4est_refine_ext",
     :PXEST_VTK_CONTEXT_NEW            => "p4est_vtk_context_new",
     :PXEST_VTK_CONTEXT_SET_SCALE      => "p4est_vtk_context_set_scale",
     :PXEST_VTK_CONTEXT_SET_CONTINUOUS => "p4est_vtk_context_set_continuous",
@@ -33,6 +34,7 @@ const libpxest =
     :PXEST_DESTROY                    => "p8est_destroy",
     :PXEST_BALANCE_EXT                => "p8est_balance_ext",
     :PXEST_PARTITION                  => "p8est_partition",
+    :PXEST_REFINE_EXT                 => "p8est_refine_ext",
     :PXEST_VTK_CONTEXT_NEW            => "p8est_vtk_context_new",
     :PXEST_VTK_CONTEXT_SET_SCALE      => "p8est_vtk_context_set_scale",
     :PXEST_VTK_CONTEXT_SET_CONTINUOUS => "p8est_vtk_context_set_continuous",
@@ -307,6 +309,16 @@ function partition(pxest; allow_for_coarsening=true)
   ccall(PXEST_PARTITION, Void, (Ptr{pxest_t}, Cint , Ptr{Void}),
         pxest.pxest_ptr, allow_for_coarsening, C_NULL)
 end
+
+function refine(pxest, refine_fn; maxlevel=-1, refine_recursive=1)
+  const refine_fn_c = cfunction(refine_fn, Cint, (Ptr{pxest_t}, pxest_topidx_t,
+                                                  Ptr{pxest_quadrant_t}));
+  ccall(PXEST_REFINE_EXT, Void,
+        (Ptr{pxest_t}, Cint, Cint, Ptr{Void}, Ptr{Void}, Ptr{Void}),
+        pxest.pxest_ptr, refine_recursive, maxlevel, refine_fn_c, C_NULL,
+        C_NULL)
+end
+
 #}}}
 
 #{{{vtk

@@ -6,11 +6,20 @@ if !MPI.Initialized()
 end
 
 
+function random_refinement(pxest, which_tree, quadrant)
+  if rand() > 0.9
+    return Cint(1)
+  else
+    return Cint(0)
+  end
+end
+
 include("p4est.jl")
 using p4est
 let
   conn = p4est.Connectivity(5,7)
-  pxest = p4est.PXEST(conn; min_lvl=2)
+  pxest = p4est.PXEST(conn; min_lvl=0)
+  p4est.refine(pxest, random_refinement; maxlevel=3)
   p4est.balance(pxest)
   p4est.partition(pxest)
 
@@ -31,7 +40,8 @@ include("p8est.jl")
 using p8est
 let
   conn = p8est.Connectivity(5,7,2)
-  pxest = p8est.PXEST(conn; min_lvl=1)
+  pxest = p8est.PXEST(conn; min_lvl=0)
+  p8est.refine(pxest, random_refinement; maxlevel=3)
   p8est.balance(pxest)
   p8est.partition(pxest)
 
