@@ -3,6 +3,7 @@ if !MPI.Initialized()
   MPI.Init()
   const mpicomm = MPI.COMM_WORLD
   const mpirank = MPI.Comm_rank(mpicomm)
+  srand(mpirank)
 end
 
 
