@@ -1,5 +1,6 @@
 using Compat.Libdl
 using MPI
+using Compat
 
 # Path to the library
 const libsc = joinpath(dirname(@__FILE__), "../deps/p4est/local/lib/libsc.dylib")
@@ -67,9 +68,9 @@ const pxest_topidx_t = Int32
 const pxest_locidx_t = Int32
 const pxest_gloidx_t = Int64
 const pxest_qcoord_t = Int32
-const sc_array_t = Void
-const sc_mempool_t = Void
-const pxest_inspect_t = Void
+const sc_array_t = Cvoid
+const sc_mempool_t = Cvoid
+const pxest_inspect_t = Cvoid
 const pxest_connect_type_t = Cuint
 @p4est const PXEST_CONNECT_FACE = pxest_connect_type_t(21)
 @p4est const PXEST_CONNECT_CORNER = pxest_connect_type_t(22)
@@ -161,7 +162,7 @@ end
 end
 
 function pxest_connectivity_destroy(conn)
-  ccall(PXEST_CONNECTIVITY_DESTROY, Void, (Ptr{Void},), conn)
+  ccall(PXEST_CONNECTIVITY_DESTROY, Cvoid, (Ptr{Cvoid},), conn)
 end
 
 mutable struct Connectivity
@@ -218,7 +219,7 @@ end
 #}}}
 
 #{{{ pxest data structure
-const piggy_size = max(sizeof(Ptr{Void}),
+const piggy_size = max(sizeof(Ptr{Cvoid}),
                        sizeof(Clong),
                        sizeof(Cint),
                        sizeof(pxest_topidx_t),
@@ -257,7 +258,7 @@ struct pxest_t
   data_size::Csize_t
 
   # convenience pointer for users, never touched by p4est
-  user_pointer::Ptr{Void}
+  user_pointer::Ptr{Cvoid}
 
   # Gets bumped on mesh change
   revision::Clong
@@ -302,9 +303,9 @@ mutable struct PXEST
   conn::Connectivity
 
   function PXEST(conn ;mpicomm=MPI.COMM_WORLD, min_lvl = 0)
-    pxest = ccall(PXEST_NEW_EXT, Ptr{Void},
+    pxest = ccall(PXEST_NEW_EXT, Ptr{Cvoid},
                   (MPI.CComm, Ptr{pxest_connectivity_t}, pxest_locidx_t,
-                   Cint, Cint, Csize_t, Ptr{Void}, Ptr{Void}),
+                   Cint, Cint, Csize_t, Ptr{Cvoid}, Ptr{Cvoid}),
                   MPI.CComm(mpicomm), conn.pxest_conn_ptr, 0, min_lvl, 1, 0,
                   C_NULL, C_NULL)
 
@@ -315,26 +316,26 @@ mutable struct PXEST
 end
 
 function pxest_destroy(pxest)
-  ccall(PXEST_DESTROY, Void, (Ptr{Void},), pxest.pxest_ptr)
+  ccall(PXEST_DESTROY, Cvoid, (Ptr{Cvoid},), pxest.pxest_ptr)
   pxest.pxest_ptr = C_NULL
 end
 
 function balance(pxest; connect = PXEST_CONNECT_FULL)
-  ccall(PXEST_BALANCE_EXT, Void,
-        (Ptr{pxest_t}, pxest_connect_type_t, Ptr{Void}, Ptr{Void}),
+  ccall(PXEST_BALANCE_EXT, Cvoid,
+        (Ptr{pxest_t}, pxest_connect_type_t, Ptr{Cvoid}, Ptr{Cvoid}),
         pxest.pxest_ptr, connect, C_NULL, C_NULL)
 end
 
 function partition(pxest; allow_for_coarsening=true)
-  ccall(PXEST_PARTITION, Void, (Ptr{pxest_t}, Cint , Ptr{Void}),
+  ccall(PXEST_PARTITION, Cvoid, (Ptr{pxest_t}, Cint , Ptr{Cvoid}),
         pxest.pxest_ptr, allow_for_coarsening, C_NULL)
 end
 
 function refine(pxest, refine_fn; maxlevel=-1, refine_recursive=1)
-  const refine_fn_c = cfunction(refine_fn, Cint, (Ptr{pxest_t}, pxest_topidx_t,
+  refine_fn_c = cfunction(refine_fn, Cint, (Ptr{pxest_t}, pxest_topidx_t,
                                                   Ptr{pxest_quadrant_t}));
-  ccall(PXEST_REFINE_EXT, Void,
-        (Ptr{pxest_t}, Cint, Cint, Ptr{Void}, Ptr{Void}, Ptr{Void}),
+  ccall(PXEST_REFINE_EXT, Cvoid,
+        (Ptr{pxest_t}, Cint, Cint, Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cvoid}),
         pxest.pxest_ptr, refine_recursive, maxlevel, refine_fn_c, C_NULL,
         C_NULL)
 end
@@ -343,22 +344,22 @@ end
 
 #{{{vtk
 function vtk_write_file(pxest, fn; scale = 1)
-  cont = ccall(PXEST_VTK_CONTEXT_NEW, Ptr{Void}, (Ptr{pxest_t}, Ptr{Cchar},),
+  cont = ccall(PXEST_VTK_CONTEXT_NEW, Ptr{Cvoid}, (Ptr{pxest_t}, Ptr{Cchar},),
                pxest.pxest_ptr, fn)
 
-  ccall(PXEST_VTK_CONTEXT_SET_SCALE, Void, (Ptr{Void}, Cdouble), cont, scale)
+  ccall(PXEST_VTK_CONTEXT_SET_SCALE, Cvoid, (Ptr{Cvoid}, Cdouble), cont, scale)
 
-  ccall(PXEST_VTK_CONTEXT_SET_CONTINUOUS, Void, (Ptr{Void}, Cint), cont, 1)
+  ccall(PXEST_VTK_CONTEXT_SET_CONTINUOUS, Cvoid, (Ptr{Cvoid}, Cint), cont, 1)
 
-  cont = ccall(PXEST_VTK_WRITE_HEADER, Ptr{Void}, (Ptr{Void},), cont)
+  cont = ccall(PXEST_VTK_WRITE_HEADER, Ptr{Cvoid}, (Ptr{Cvoid},), cont)
   cont == C_NULL ? error(string(fn, "_vtk: Error writing header")) : nothing
 
-  cont = ccall(PXEST_VTK_WRITE_CELL_DATAF, Ptr{Void},
-               (Ptr{Void}, Cint, Cint, Cint, Cint, Cint, Cint, Ptr{Void}...),
+  cont = ccall(PXEST_VTK_WRITE_CELL_DATAF, Ptr{Cvoid},
+               (Ptr{Cvoid}, Cint, Cint, Cint, Cint, Cint, Cint, Ptr{Cvoid}...),
                cont, 1, 1, 1, 0, 0, 0, cont)
   cont == C_NULL ? error(string(fn, "_vtk: Error writing cell data")) : nothing
 
-  retval = ccall(PXEST_VTK_WRITE_FOOTER, Cint, (Ptr{Void},), cont)
+  retval = ccall(PXEST_VTK_WRITE_FOOTER, Cint, (Ptr{Cvoid},), cont)
   retval != 0 ? error(string(fn, "_vtk: Error writing footer")) : nothing;
 end
 #}}}
