@@ -25,7 +25,7 @@ ifeq ($(UNAME_S),Linux)
 endif
 
 all:
-	tar xzf tpl/p4est-*.tar.gz && mv p4est-* p4est
+	tar xzf downloads/p4est-*.tar.gz && mv p4est-* p4est
 	cd p4est && ./configure CC=$(CC) CXX=$(CXX) F77=$(F77) FC=$(FC) --enable-mpi --enable-debug --without-blas \
            && $(MAKE) install
 

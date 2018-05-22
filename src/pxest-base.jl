@@ -1,10 +1,8 @@
 using MPI
 
 # Path to the library
-const libsc =
-  "p4est/local/lib/libsc.dylib"
-const libpxest =
-  "p4est/local/lib/libp4est.dylib"
+const libsc = joinpath(@__FILE__, "../deps/p4est/local/lib/libsc.dylib"
+const libpxest = joinpath(@__FILE__, "../deps/p4est/local/lib/libp4est.dylib"
 
 # Functions to load
 @p4est const _pxest_functions = Dict{Symbol, String}(
