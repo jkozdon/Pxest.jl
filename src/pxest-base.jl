@@ -1,8 +1,9 @@
+using Compat.Libdl
 using MPI
 
 # Path to the library
-const libsc = joinpath(@__FILE__, "../deps/p4est/local/lib/libsc.dylib"
-const libpxest = joinpath(@__FILE__, "../deps/p4est/local/lib/libp4est.dylib"
+const libsc = joinpath(dirname(@__FILE__), "../deps/p4est/local/lib/libsc.dylib")
+const libpxest = joinpath(dirname(@__FILE__), "../deps/p4est/local/lib/libp4est.dylib")
 
 # Functions to load
 @p4est const _pxest_functions = Dict{Symbol, String}(
