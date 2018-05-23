@@ -198,12 +198,12 @@ mutable struct Connectivity
     num_vertices = C.num_vertices
     num_trees = C.num_trees
     vertices = unsafe_wrap(Array{Cdouble, 2}, C.vertices,
-                           (3, Int(num_vertices)), false)
+                           (3, Int(num_vertices)))
     tree_to_vertex = unsafe_wrap(Array{pxest_topidx_t, 2}, C.tree_to_vertex,
-                                 (PXEST_CHILDREN, Int(num_trees)), false)
+                                 (PXEST_CHILDREN, Int(num_trees)))
     this = new(num_vertices, num_trees, vertices, tree_to_vertex,
                pxest_conn_ptr)
-    finalizer(this, connectivity_destroy)
+    @compat finalizer(connectivity_destroy, this)
     return this
   end
 end
@@ -310,7 +310,7 @@ mutable struct PXEST
                   C_NULL, C_NULL)
 
     this = new(pxest, conn)
-    finalizer(this, pxest_destroy)
+    @compat finalizer(pxest_destroy, this)
     return this
   end
 end
