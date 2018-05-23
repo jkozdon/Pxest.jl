@@ -331,9 +331,9 @@ function partition(pxest; allow_for_coarsening=true)
         pxest.pxest_ptr, allow_for_coarsening, C_NULL)
 end
 
-function refine(pxest, refine_fn; maxlevel=-1, refine_recursive=1)
-  refine_fn_c = cfunction(refine_fn, Cint, (Ptr{pxest_t}, pxest_topidx_t,
-                                                  Ptr{pxest_quadrant_t}));
+function refine(pxest, refine_fn, maxlevel, refine_recursive=1)
+  refine_fn_c = @cfunction($refine_fn, Cint, (Ptr{pxest_t}, pxest_topidx_t,
+                                                  Ptr{pxest_quadrant_t}))
   ccall(PXEST_REFINE_EXT, Cvoid,
         (Ptr{pxest_t}, Cint, Cint, Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cvoid}),
         pxest.pxest_ptr, refine_recursive, maxlevel, refine_fn_c, C_NULL,
