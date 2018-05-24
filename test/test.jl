@@ -27,6 +27,7 @@ let
   p4est.balance!(mesh)
   p4est.partition!(mesh)
 
+  # dump VTK
   vtk_dir = "vtk_files"
   vtk_base = "mesh_p4est"
   mpirank == 0 ? mkpath(vtk_dir) : nothing
@@ -48,6 +49,7 @@ let
   p8est.balance!(mesh)
   p8est.partition!(mesh)
 
+  # dump VTK
   vtk_dir = "vtk_files"
   vtk_base = "mesh_p8est"
   mpirank == 0 ? mkpath(vtk_dir) : nothing
