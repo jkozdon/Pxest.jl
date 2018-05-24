@@ -335,9 +335,22 @@ function partition!(pxest; allow_for_coarsening=true)
         pxest.pxest_ptr, allow_for_coarsening, C_NULL)
 end
 
-function refine!(pxest, refine_fn, maxlevel, refine_recursive=1)
+# FIXME: Use keyword arguments
+function refine!(pxest, refine_fn, maxlevel=-1, refine_recursive=1)
+  refine_call!(pxest, (x,y,z)->refine_fn_wrapper(x,y,z,refine_fn, pxest),
+               maxlevel, refine_recursive)
+end
+
+function refine_fn_wrapper(pxest_ptr, which_tree, quadrant_ptr,
+                           pxest, refine_fn)::Cint
+  quadrant = unsafe_wrap(Array{pxest_quadrant_t, 1}, quadrant_ptr,
+                         (1, ))
+  refine_fn(pxest, which_tree, quadrant[1])
+end
+
+function refine_call!(pxest, refine_fn, maxlevel, refine_recursive)
   refine_fn_c = @cfunction($refine_fn, Cint, (Ptr{pxest_t}, pxest_topidx_t,
-                                                  Ptr{pxest_quadrant_t}))
+                                                  Ref{pxest_quadrant_t}))
   ccall(PXEST_REFINE_EXT, Cvoid,
         (Ptr{pxest_t}, Cint, Cint, Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cvoid}),
         pxest.pxest_ptr, refine_recursive, maxlevel, refine_fn_c, C_NULL,
