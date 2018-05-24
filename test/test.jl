@@ -34,9 +34,9 @@ let
   p4est.vtk_write_file(mesh, string(vtk_dir, "/", vtk_base))
   if mpirank == 0
     mv(string(vtk_dir, "/", vtk_base, ".pvtu"), string(vtk_base, ".pvtu"),
-      remove_destination=true)
+      force=true)
     mv(string(vtk_dir, "/", vtk_base, ".visit"), string(vtk_base, ".visit"),
-      remove_destination=true)
+      force=true)
   end
 end
 
@@ -55,9 +55,9 @@ let
   p8est.vtk_write_file(mesh, string(vtk_dir, "/", vtk_base))
   if mpirank == 0
     mv(string(vtk_dir, "/", vtk_base, ".pvtu"), string(vtk_base, ".pvtu"),
-      remove_destination=true)
+      force=true)
     mv(string(vtk_dir, "/", vtk_base, ".visit"), string(vtk_base, ".visit"),
-      remove_destination=true)
+      force=true)
   end
 end
 
