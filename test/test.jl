@@ -23,9 +23,9 @@ using pxest.p4est
 let
   conn = p4est.Connectivity(5,7)
   mesh = p4est.PXEST(conn; min_lvl=0)
-  p4est.refine(mesh, random_refinement, 3)
-  p4est.balance(mesh)
-  p4est.partition(mesh)
+  p4est.refine!(mesh, random_refinement, 3)
+  p4est.balance!(mesh)
+  p4est.partition!(mesh)
 
   vtk_dir = "vtk_files"
   vtk_base = "mesh_p4est"
@@ -44,9 +44,9 @@ using pxest.p8est
 let
   conn = p8est.Connectivity(5,7,2)
   mesh = p8est.PXEST(conn; min_lvl=0)
-  p8est.refine(mesh, random_refinement, 3)
-  p8est.balance(mesh)
-  p8est.partition(mesh)
+  p8est.refine!(mesh, random_refinement, 3)
+  p8est.balance!(mesh)
+  p8est.partition!(mesh)
 
   vtk_dir = "vtk_files"
   vtk_base = "mesh_p8est"

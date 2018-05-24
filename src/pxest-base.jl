@@ -320,18 +320,18 @@ function pxest_destroy(pxest)
   pxest.pxest_ptr = C_NULL
 end
 
-function balance(pxest; connect = PXEST_CONNECT_FULL)
+function balance!(pxest; connect = PXEST_CONNECT_FULL)
   ccall(PXEST_BALANCE_EXT, Cvoid,
         (Ptr{pxest_t}, pxest_connect_type_t, Ptr{Cvoid}, Ptr{Cvoid}),
         pxest.pxest_ptr, connect, C_NULL, C_NULL)
 end
 
-function partition(pxest; allow_for_coarsening=true)
+function partition!(pxest; allow_for_coarsening=true)
   ccall(PXEST_PARTITION, Cvoid, (Ptr{pxest_t}, Cint , Ptr{Cvoid}),
         pxest.pxest_ptr, allow_for_coarsening, C_NULL)
 end
 
-function refine(pxest, refine_fn, maxlevel, refine_recursive=1)
+function refine!(pxest, refine_fn, maxlevel, refine_recursive=1)
   refine_fn_c = @cfunction($refine_fn, Cint, (Ptr{pxest_t}, pxest_topidx_t,
                                                   Ptr{pxest_quadrant_t}))
   ccall(PXEST_REFINE_EXT, Cvoid,
