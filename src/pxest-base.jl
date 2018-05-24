@@ -231,6 +231,7 @@ struct pxest_quadrant_t
   # coordinates
   x::pxest_qcoord_t
   y::pxest_qcoord_t
+  @p8est z::pxest_qcoord_t
 
   level::Int8    # level of refinement
   pad8::Int8     # padding
