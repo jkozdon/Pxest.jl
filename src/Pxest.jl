@@ -25,6 +25,10 @@ module p8est
 
   include("pxest-base.jl")
 
+  module Mesh
+    include("pxest-mesh.jl")
+  end
+
 end
 
 end
