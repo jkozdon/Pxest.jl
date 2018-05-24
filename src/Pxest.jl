@@ -1,4 +1,4 @@
-module pxest
+module Pxest
 
 module p4est
   macro p4est(ex)

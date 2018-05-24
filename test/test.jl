@@ -10,7 +10,7 @@ if !MPI.Initialized()
 end
 
 
-function random_refinement(mesh, which_tree, quadrant)::Cint
+function random_refinement(pxest, which_tree, quadrant)::Cint
   if rand() > 0.9
     return Cint(1)
   else
@@ -19,21 +19,21 @@ function random_refinement(mesh, which_tree, quadrant)::Cint
 end
 
 
-using pxest.p4est
+using Pxest.p4est
 let
   conn = p4est.Connectivity(5,7)
-  mesh = p4est.PXEST(conn; min_lvl=0)
-  p4est.refine!(mesh, random_refinement, 3)
-  p4est.balance!(mesh)
-  p4est.partition!(mesh)
-  p4est.ghost!(mesh)
+  pxest = p4est.PXEST(conn; min_lvl=0)
+  p4est.refine!(pxest, random_refinement, 3)
+  p4est.balance!(pxest)
+  p4est.partition!(pxest)
+  p4est.ghost!(pxest)
 
   # dump VTK
   vtk_dir = "vtk_files"
   vtk_base = "mesh_p4est"
   mpirank == 0 ? mkpath(vtk_dir) : nothing
   MPI.Barrier(mpicomm)
-  p4est.vtk_write_file(mesh, string(vtk_dir, "/", vtk_base))
+  p4est.vtk_write_file(pxest, string(vtk_dir, "/", vtk_base))
   if mpirank == 0
     mv(string(vtk_dir, "/", vtk_base, ".pvtu"), string(vtk_base, ".pvtu"),
       force=true)
@@ -42,21 +42,21 @@ let
   end
 end
 
-using pxest.p8est
+using Pxest.p8est
 let
   conn = p8est.Connectivity(5,7,2)
-  mesh = p8est.PXEST(conn; min_lvl=0)
-  p8est.refine!(mesh, random_refinement, 3)
-  p8est.balance!(mesh)
-  p8est.partition!(mesh)
-  p8est.ghost!(mesh)
+  pxest = p8est.PXEST(conn; min_lvl=0)
+  p8est.refine!(pxest, random_refinement, 3)
+  p8est.balance!(pxest)
+  p8est.partition!(pxest)
+  p8est.ghost!(pxest)
 
   # dump VTK
   vtk_dir = "vtk_files"
   vtk_base = "mesh_p8est"
   mpirank == 0 ? mkpath(vtk_dir) : nothing
   MPI.Barrier(mpicomm)
-  p8est.vtk_write_file(mesh, string(vtk_dir, "/", vtk_base))
+  p8est.vtk_write_file(pxest, string(vtk_dir, "/", vtk_base))
   if mpirank == 0
     mv(string(vtk_dir, "/", vtk_base, ".pvtu"), string(vtk_base, ".pvtu"),
       force=true)
