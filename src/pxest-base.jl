@@ -62,6 +62,9 @@ end
 #{{{ p4est constants and types
 @p4est const PXEST_CHILDREN = 4
 @p8est const PXEST_CHILDREN = 8
+@p4est const PXEST_MAXLEVEL = 30
+@p8est const PXEST_MAXLEVEL = 19
+const PXEST_ROOT_LEN = 1 << PXEST_MAXLEVEL
 
 # Connectivity data structures
 const pxest_topidx_t = Int32
