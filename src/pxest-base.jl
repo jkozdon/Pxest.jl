@@ -369,14 +369,14 @@ function vtk_write_file(pxest, fn; scale = 1)
   ccall(PXEST_VTK_CONTEXT_SET_CONTINUOUS, Cvoid, (Ptr{Cvoid}, Cint), cont, 1)
 
   cont = ccall(PXEST_VTK_WRITE_HEADER, Ptr{Cvoid}, (Ptr{Cvoid},), cont)
-  cont == C_NULL ? error(string(fn, "_vtk: Error writing header")) : nothing
+  cont != C_NULL || error(string(fn, "_vtk: Error writing header"))
 
   cont = ccall(PXEST_VTK_WRITE_CELL_DATAF, Ptr{Cvoid},
                (Ptr{Cvoid}, Cint, Cint, Cint, Cint, Cint, Cint, Ptr{Cvoid}...),
                cont, 1, 1, 1, 0, 0, 0, cont)
-  cont == C_NULL ? error(string(fn, "_vtk: Error writing cell data")) : nothing
+  cont != C_NULL || error(string(fn, "_vtk: Error writing cell data"))
 
   retval = ccall(PXEST_VTK_WRITE_FOOTER, Cint, (Ptr{Cvoid},), cont)
-  retval != 0 ? error(string(fn, "_vtk: Error writing footer")) : nothing;
+  retval == 0 || error(string(fn, "_vtk: Error writing footer"))
 end
 #}}}
