@@ -26,6 +26,7 @@ let
   p4est.refine!(mesh, random_refinement, 3)
   p4est.balance!(mesh)
   p4est.partition!(mesh)
+  p4est.ghost!(mesh)
 
   # dump VTK
   vtk_dir = "vtk_files"
@@ -48,6 +49,7 @@ let
   p8est.refine!(mesh, random_refinement, 3)
   p8est.balance!(mesh)
   p8est.partition!(mesh)
+  p8est.ghost!(mesh)
 
   # dump VTK
   vtk_dir = "vtk_files"

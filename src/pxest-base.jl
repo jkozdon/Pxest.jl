@@ -16,6 +16,8 @@ const libpxest = joinpath(dirname(@__FILE__), "../deps/p4est/local/lib/libp4est.
     :PXEST_DESTROY                    => "p4est_destroy",
     :PXEST_BALANCE_EXT                => "p4est_balance_ext",
     :PXEST_PARTITION                  => "p4est_partition",
+    :PXEST_GHOST_NEW                  => "p4est_ghost_new",
+    :PXEST_GHOST_DESTROY              => "p4est_ghost_destroy",
     :PXEST_REFINE_EXT                 => "p4est_refine_ext",
     :PXEST_VTK_CONTEXT_NEW            => "p4est_vtk_context_new",
     :PXEST_VTK_CONTEXT_SET_SCALE      => "p4est_vtk_context_set_scale",
@@ -34,6 +36,8 @@ const libpxest = joinpath(dirname(@__FILE__), "../deps/p4est/local/lib/libp4est.
     :PXEST_DESTROY                    => "p8est_destroy",
     :PXEST_BALANCE_EXT                => "p8est_balance_ext",
     :PXEST_PARTITION                  => "p8est_partition",
+    :PXEST_GHOST_NEW                  => "p8est_ghost_new",
+    :PXEST_GHOST_DESTROY              => "p8est_ghost_destroy",
     :PXEST_REFINE_EXT                 => "p8est_refine_ext",
     :PXEST_VTK_CONTEXT_NEW            => "p8est_vtk_context_new",
     :PXEST_VTK_CONTEXT_SET_SCALE      => "p8est_vtk_context_set_scale",
@@ -222,6 +226,50 @@ end
 #}}}
 
 #{{{ pxest data structure
+struct pxest_ghost_t
+  mpisize::Cint
+  num_trees::pxest_topidx_t
+  btype::pxest_connect_type_t # which neighbors are in the ghost layer
+
+  #=
+  # An array of quadrants which make up the ghost layer around \a
+  # p4est.  Their piggy3 data member is filled with their owner's tree
+  # and local number (cumulative over trees).  Quadrants are ordered in \c
+  # p4est_quadrant_compare_piggy order.  These are quadrants inside the
+  # neighboring tree, i.e., \c p4est_quadrant_is_inside() is true for the
+  # quadrant and the neighboring tree.
+  =#
+
+  ghosts::sc_array_t # array of p4est_quadrant_t type
+  tree_offsets::Ptr{pxest_locidx_t} # num_trees + 1 ghost indices
+  proc_offsets::Ptr{pxest_locidx_t} # mpisize + 1 ghost indices
+
+  #=
+  # An array of local quadrants that touch the parallel boundary from the
+  # inside, i.e., that are ghosts in the perspective of at least one other
+  # processor.  The storage convention is the same as for \c ghosts above.
+  =#
+  mirrors::sc_array_t # array of p4est_quadrant_t type
+  mirror_tree_offsets::Ptr{pxest_locidx_t} # num_trees + 1 mirror indices
+  #=
+  # indices into mirrors grouped by outside processor rank and ascending within
+  # each rank
+  =#
+  mirror_proc_mirrors::Ptr{pxest_locidx_t}
+
+  # mpisize + 1 indices into mirror_proc_mirrors
+  mirror_proc_offsets::Ptr{pxest_locidx_t}
+
+  #=
+  # like mirror_proc_mirrors, but limited to the outermost octants.  This is
+  # NULL until p4est_ghost_expand is called
+  =#
+  mirror_proc_fronts::Ptr{pxest_locidx_t}
+
+  # NULL until p4est_ghost_expand is called
+  mirror_proc_front_offsets::Ptr{pxest_locidx_t}
+end
+
 const piggy_size = max(sizeof(Ptr{Cvoid}),
                        sizeof(Clong),
                        sizeof(Cint),
@@ -305,21 +353,25 @@ end
 mutable struct PXEST
   pxest_ptr::Ptr{pxest_t}
   conn::Connectivity
+  ghost::Ptr{pxest_ghost_t}
 
   function PXEST(conn ;mpicomm=MPI.COMM_WORLD, min_lvl = 0)
-    pxest = ccall(PXEST_NEW_EXT, Ptr{Cvoid},
+    pxest = ccall(PXEST_NEW_EXT, Ptr{pxest_t},
                   (MPI.CComm, Ptr{pxest_connectivity_t}, pxest_locidx_t,
                    Cint, Cint, Csize_t, Ptr{Cvoid}, Ptr{Cvoid}),
                   MPI.CComm(mpicomm), conn.pxest_conn_ptr, 0, min_lvl, 1, 0,
                   C_NULL, C_NULL)
 
-    this = new(pxest, conn)
+    this = new(pxest, conn, C_NULL)
     @compat finalizer(pxest_destroy, this)
     return this
   end
 end
 
 function pxest_destroy(pxest)
+  if pxest.ghost != C_NULL
+    ghost_destroy!(pxest)
+  end
   ccall(PXEST_DESTROY, Cvoid, (Ptr{Cvoid},), pxest.pxest_ptr)
   pxest.pxest_ptr = C_NULL
 end
@@ -356,6 +408,20 @@ function refine_call!(pxest, refine_fn, maxlevel, refine_recursive)
         pxest.pxest_ptr, refine_recursive, maxlevel, refine_fn_c, C_NULL,
         C_NULL)
 end
+
+function ghost!(pxest; connect = PXEST_CONNECT_FULL)
+  pxest.ghost == C_NULL || error("ghost is not C_NULL")
+  pxest.ghost = ccall(PXEST_GHOST_NEW, Ptr{pxest_ghost_t},
+                      (Ptr{pxest_t}, pxest_connect_type_t),
+                      pxest.pxest_ptr, connect)
+end
+
+function ghost_destroy!(pxest; connect = PXEST_CONNECT_FULL)
+  pxest.ghost != C_NULL || error("ghost is C_NULL")
+  ccall(PXEST_GHOST_DESTROY, Cvoid, (Ptr{pxest_ghost_t},), pxest.ghost)
+  pxest.ghost = C_NULL
+end
+
 
 #}}}
 
