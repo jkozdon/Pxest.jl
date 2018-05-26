@@ -394,20 +394,17 @@ function partition!(pxest; allow_for_coarsening=true)
 end
 
 # FIXME: Use keyword arguments
-function refine!(pxest, refine_fn, maxlevel=-1, refine_recursive=1)
-  refine_call!(pxest, (x,y,z)->refine_fn_wrapper(x,y,z,refine_fn, pxest),
-               maxlevel, refine_recursive)
+function refine!(refine_fn::Function, pxest::PXEST, maxlevel=-1, refine_recursive=1)
+  refine_call!(pxest, (x,y,z)->refine_fn(y,z), maxlevel, refine_recursive)
 end
 
-function refine_fn_wrapper(pxest_ptr, which_tree, quadrant_ptr,
-                           pxest, refine_fn)::Cint
-  quadrant = unsafe_wrap(Array{pxest_quadrant_t, 1}, quadrant_ptr,
-                         (1, ))
-  refine_fn(pxest, which_tree, quadrant[1])
+function refine!(pxest::PXEST, refine_fn::Function, maxlevel=-1, refine_recursive=1)
+  refine_call!(pxest, (x,y,z)->refine_fn(y,z), maxlevel, refine_recursive)
 end
 
-function refine_call!(pxest, refine_fn, maxlevel, refine_recursive)
-  refine_fn_c = @cfunction($refine_fn, Cint, (Ptr{pxest_t}, pxest_topidx_t,
+function refine_call!(pxest::PXEST, refine_fn, maxlevel, refine_recursive)
+  println(typeof(pxest)) ## TODO: Remove once compiler fixed
+  refine_fn_c = @cfunction($refine_fn, Cint, (Ref{pxest_t}, pxest_topidx_t,
                                                   Ref{pxest_quadrant_t}))
   ccall(PXEST_REFINE_EXT, Cvoid,
         (Ref{pxest_t}, Cint, Cint, Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cvoid}),
