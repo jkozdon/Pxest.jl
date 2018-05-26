@@ -62,13 +62,13 @@ let
   f = 0
   c = 0
   p4est.iterator(pxest,
-                 (x,)->begin
+                 (quad,)->begin
                    q+=1
                  end,
-                 (x,)->begin
+                 (face,)->begin
                    f+=1
                  end,
-                 (x,)->begin
+                 (corn,)->begin
                    c+=1
                  end)
   println((q, f, c))
@@ -128,16 +128,16 @@ let
   e = 0
   c = 0
   p8est.iterator(pxest,
-                 (x,)->begin
+                 (quad,)->begin
                    q+=1
                  end,
-                 (x,)->begin
+                 (face,)->begin
                    f+=1
                  end,
-                 (x,)->begin
+                 (edge,)->begin
                    e+=1
                  end,
-                 (x,)->begin
+                 (corn,)->begin
                    c+=1
                  end)
 end
