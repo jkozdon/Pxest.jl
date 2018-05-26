@@ -65,6 +65,12 @@ let
     mv(string(vtk_dir, "/", vtk_base, ".visit"), string(vtk_base, ".visit"),
       force=true)
   end
+
+  q = 0
+  p8est.quadrants(pxest) do
+    println(q)
+    q = q+1
+  end
 end
 
 if !isinteractive()

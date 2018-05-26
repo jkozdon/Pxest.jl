@@ -25,6 +25,7 @@ const libpxest = joinpath(dirname(@__FILE__), "../deps/p4est/local/lib/libp4est.
     :PXEST_VTK_WRITE_HEADER           => "p4est_vtk_write_header",
     :PXEST_VTK_WRITE_CELL_DATAF       => "p4est_vtk_write_cell_dataf",
     :PXEST_VTK_WRITE_FOOTER           => "p4est_vtk_write_footer",
+    :PXEST_ITERATE                    => "p4est_iterate",
    )
 
 @p8est const _pxest_functions = Dict{Symbol, String}(
@@ -45,6 +46,7 @@ const libpxest = joinpath(dirname(@__FILE__), "../deps/p4est/local/lib/libp4est.
     :PXEST_VTK_WRITE_HEADER           => "p8est_vtk_write_header",
     :PXEST_VTK_WRITE_CELL_DATAF       => "p8est_vtk_write_cell_dataf",
     :PXEST_VTK_WRITE_FOOTER           => "p8est_vtk_write_footer",
+    :PXEST_ITERATE                    => "p8est_iterate",
    )
 
 # Build symbols
@@ -425,6 +427,43 @@ function ghost_destroy!(pxest; connect = PXEST_CONNECT_FULL)
   ccall(PXEST_GHOST_DESTROY, Cvoid, (Ptr{pxest_ghost_t},), pxest.ghost)
   pxest.ghost = C_NULL
 end
+
+struct pxest_iter_volume_info_t
+  pxest::Ptr{pxest_t}
+  ghost_layer::Ptr{pxest_ghost_t}
+  quad::Ptr{pxest_quadrant_t} # the quadrant of the callback
+  quadid::pxest_locidx_t      # id in \a quad's tree array (see p4est_tree_t)
+  treeid::pxest_topidx_t      # the tree containing \a quad
+end
+
+function quad_fn_wrapper(pxest_ptr, (pxest, quad_fn))::Cvoid
+  quad_fn()
+  nothing
+end
+
+function quadrants(vol_fn::Function, pxest)
+  quadrants(pxest, vol_fn)
+end
+
+function quadrants(pxest, vol_fn::Function)
+  quad_fn = @cfunction($quad_fn_wrapper, Cvoid,
+                       (Ptr{pxest_iter_volume_info_t},
+                        Ref{Tuple{PXEST, Function}}))
+
+  @p4est ccall(PXEST_ITERATE, Cvoid, (Ref{pxest_t}, Ptr{pxest_ghost_t},
+                                      Ref{Tuple{PXEST, Function}},
+                               Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cvoid}),
+               pxest.pxest, C_NULL, (pxest, vol_fn), quad_fn, C_NULL, C_NULL)
+
+  @p8est ccall(PXEST_ITERATE, Cvoid, (Ref{pxest_t}, Ptr{pxest_ghost_t},
+                                      Ref{Tuple{PXEST, Function}},
+                                      Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cvoid},
+                                      Ptr{Cvoid}),
+               pxest.pxest, C_NULL, (pxest, vol_fn), quad_fn, C_NULL,
+               C_NULL, C_NULL)
+end
+
+
 
 #}}}
 
