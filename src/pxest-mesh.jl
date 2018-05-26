@@ -1,4 +1,4 @@
-mutable struct mesh_connectivity
+mutable struct Mesh
   EToL::Array{Cint, 1} # element to p4est level
   EToT::Array{Cint, 1} # element to p4est treeid
   EToX::Array{Cint, 1} # element to p4est x-qcoord

@@ -12,8 +12,8 @@ const libpxest = joinpath(dirname(@__FILE__), "../deps/p4est/local/lib/libp4est.
     :PXEST_CONNECTIVITY_READ_INP      => "p4est_connectivity_read_inp",
     :PXEST_CONNECTIVITY_NEW_BYNAME    => "p4est_connectivity_new_byname",
     :PXEST_CONNECTIVITY_DESTROY       => "p4est_connectivity_destroy",
-    :PXEST_NEW_EXT                    => "p4est_new_ext",
-    :PXEST_DESTROY                    => "p4est_destroy",
+    :PXEST_INIT_EXT                   => "p4est_init_ext",
+    :PXEST_DESTROY_EXT                => "p4est_destroy_ext",
     :PXEST_BALANCE_EXT                => "p4est_balance_ext",
     :PXEST_PARTITION                  => "p4est_partition",
     :PXEST_GHOST_NEW                  => "p4est_ghost_new",
@@ -32,8 +32,8 @@ const libpxest = joinpath(dirname(@__FILE__), "../deps/p4est/local/lib/libp4est.
     :PXEST_CONNECTIVITY_READ_INP      => "p8est_connectivity_read_inp",
     :PXEST_CONNECTIVITY_NEW_BYNAME    => "p8est_connectivity_new_byname",
     :PXEST_CONNECTIVITY_DESTROY       => "p8est_connectivity_destroy",
-    :PXEST_NEW_EXT                    => "p8est_new_ext",
-    :PXEST_DESTROY                    => "p8est_destroy",
+    :PXEST_INIT_EXT                   => "p8est_init_ext",
+    :PXEST_DESTROY_EXT                => "p8est_destroy_ext",
     :PXEST_BALANCE_EXT                => "p8est_balance_ext",
     :PXEST_PARTITION                  => "p8est_partition",
     :PXEST_GHOST_NEW                  => "p8est_ghost_new",
@@ -292,7 +292,7 @@ struct pxest_quadrant_t
   piggy_data::NTuple{piggy_size, Cchar}
 end
 
-struct pxest_t
+mutable struct pxest_t
   # MPI communicator
   mpicomm::MPI.CComm
 
@@ -348,19 +348,24 @@ struct pxest_t
 
   # algorithmic switches
   inspect::Ptr{pxest_inspect_t}
+
+  function pxest_t()
+    new()
+  end
 end
 
 mutable struct PXEST
-  pxest_ptr::Ptr{pxest_t}
+  pxest::pxest_t
   conn::Connectivity
   ghost::Ptr{pxest_ghost_t}
 
   function PXEST(conn ;mpicomm=MPI.COMM_WORLD, min_lvl = 0)
-    pxest = ccall(PXEST_NEW_EXT, Ptr{pxest_t},
-                  (MPI.CComm, Ptr{pxest_connectivity_t}, pxest_locidx_t,
-                   Cint, Cint, Csize_t, Ptr{Cvoid}, Ptr{Cvoid}),
-                  MPI.CComm(mpicomm), conn.pxest_conn_ptr, 0, min_lvl, 1, 0,
-                  C_NULL, C_NULL)
+    pxest = pxest_t()
+    ccall(PXEST_INIT_EXT, Cvoid,
+          (Ref{pxest_t}, MPI.CComm, Ptr{pxest_connectivity_t}, pxest_locidx_t,
+           Cint, Cint, Csize_t, Ptr{Cvoid}, Ptr{Cvoid}),
+          pxest, MPI.CComm(mpicomm), conn.pxest_conn_ptr, 0, min_lvl, 1, 0,
+          C_NULL, C_NULL)
 
     this = new(pxest, conn, C_NULL)
     @compat finalizer(pxest_destroy, this)
@@ -372,19 +377,18 @@ function pxest_destroy(pxest)
   if pxest.ghost != C_NULL
     ghost_destroy!(pxest)
   end
-  ccall(PXEST_DESTROY, Cvoid, (Ptr{Cvoid},), pxest.pxest_ptr)
-  pxest.pxest_ptr = C_NULL
+  ccall(PXEST_DESTROY_EXT, Cvoid, (Ref{pxest_t}, Cint), pxest.pxest, 0)
 end
 
 function balance!(pxest; connect = PXEST_CONNECT_FULL)
   ccall(PXEST_BALANCE_EXT, Cvoid,
-        (Ptr{pxest_t}, pxest_connect_type_t, Ptr{Cvoid}, Ptr{Cvoid}),
-        pxest.pxest_ptr, connect, C_NULL, C_NULL)
+        (Ref{pxest_t}, pxest_connect_type_t, Ptr{Cvoid}, Ptr{Cvoid}),
+        pxest.pxest, connect, C_NULL, C_NULL)
 end
 
 function partition!(pxest; allow_for_coarsening=true)
-  ccall(PXEST_PARTITION, Cvoid, (Ptr{pxest_t}, Cint , Ptr{Cvoid}),
-        pxest.pxest_ptr, allow_for_coarsening, C_NULL)
+  ccall(PXEST_PARTITION, Cvoid, (Ref{pxest_t}, Cint , Ptr{Cvoid}),
+        pxest.pxest, allow_for_coarsening, C_NULL)
 end
 
 # FIXME: Use keyword arguments
@@ -404,16 +408,16 @@ function refine_call!(pxest, refine_fn, maxlevel, refine_recursive)
   refine_fn_c = @cfunction($refine_fn, Cint, (Ptr{pxest_t}, pxest_topidx_t,
                                                   Ref{pxest_quadrant_t}))
   ccall(PXEST_REFINE_EXT, Cvoid,
-        (Ptr{pxest_t}, Cint, Cint, Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cvoid}),
-        pxest.pxest_ptr, refine_recursive, maxlevel, refine_fn_c, C_NULL,
+        (Ref{pxest_t}, Cint, Cint, Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cvoid}),
+        pxest.pxest, refine_recursive, maxlevel, refine_fn_c, C_NULL,
         C_NULL)
 end
 
 function ghost!(pxest; connect = PXEST_CONNECT_FULL)
   pxest.ghost == C_NULL || error("ghost is not C_NULL")
   pxest.ghost = ccall(PXEST_GHOST_NEW, Ptr{pxest_ghost_t},
-                      (Ptr{pxest_t}, pxest_connect_type_t),
-                      pxest.pxest_ptr, connect)
+                      (Ref{pxest_t}, pxest_connect_type_t),
+                      pxest.pxest, connect)
 end
 
 function ghost_destroy!(pxest; connect = PXEST_CONNECT_FULL)
@@ -422,13 +426,12 @@ function ghost_destroy!(pxest; connect = PXEST_CONNECT_FULL)
   pxest.ghost = C_NULL
 end
 
-
 #}}}
 
 #{{{vtk
 function vtk_write_file(pxest, fn; scale = 1)
-  cont = ccall(PXEST_VTK_CONTEXT_NEW, Ptr{Cvoid}, (Ptr{pxest_t}, Ptr{Cchar},),
-               pxest.pxest_ptr, fn)
+  cont = ccall(PXEST_VTK_CONTEXT_NEW, Ptr{Cvoid}, (Ref{pxest_t}, Ptr{Cchar},),
+               pxest.pxest, fn)
 
   ccall(PXEST_VTK_CONTEXT_SET_SCALE, Cvoid, (Ptr{Cvoid}, Cdouble), cont, scale)
 
