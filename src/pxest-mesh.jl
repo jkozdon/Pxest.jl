@@ -10,7 +10,7 @@ mutable struct Mesh
   EToO::Array{Cint, 2} # element to neighbor orientation
   EToP::Array{Cint, 2} # element to periodicity mask (filled only for brick)
 
-  function mesh_connectivity(pxest)
+  function Mesh(pxest)
     mesh = new()
   end
 end

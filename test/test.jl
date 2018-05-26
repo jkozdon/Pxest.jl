@@ -27,7 +27,7 @@ let
   p4est.balance!(pxest)
   p4est.partition!(pxest)
   p4est.ghost!(pxest)
-  mesh = p4est.Mesh.mesh_connectivity(pxest)
+  mesh = p4est.Mesh(pxest)
 
   # dump VTK
   vtk_dir = "vtk_files"
@@ -51,7 +51,7 @@ let
   p8est.balance!(pxest)
   p8est.partition!(pxest)
   p8est.ghost!(pxest)
-  mesh = p8est.Mesh.mesh_connectivity(pxest)
+  mesh = p8est.Mesh(pxest)
 
   # dump VTK
   vtk_dir = "vtk_files"

@@ -11,6 +11,8 @@ module p4est
 
   include("pxest-base.jl")
 
+  include("pxest-mesh.jl")
+
 end
 
 module p8est
@@ -25,9 +27,7 @@ module p8est
 
   include("pxest-base.jl")
 
-  module Mesh
-    include("pxest-mesh.jl")
-  end
+  include("pxest-mesh.jl")
 
 end
 
