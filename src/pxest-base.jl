@@ -433,31 +433,126 @@ struct pxest_iter_volume_info_t
   treeid::pxest_topidx_t      # the tree containing \a quad
 end
 
+const pxest_iter_face_info_t = Cvoid
+@p8est const pxest_iter_edge_info_t = Cvoid
+const pxest_iter_corner_info_t = Cvoid
+
 function quad_fn_wrapper(pxest_ptr, (pxest, quad_fn))::Cvoid
   quad_fn()
   nothing
 end
 
-function quadrants(vol_fn::Function, pxest)
-  quadrants(pxest, vol_fn)
+function quadrants(quad_fn::Function, pxest)
+  quadrants(pxest, quad_fn)
 end
 
-function quadrants(pxest, vol_fn::Function)
-  quad_fn = @cfunction($quad_fn_wrapper, Cvoid,
-                       (Ptr{pxest_iter_volume_info_t},
-                        Ref{Tuple{PXEST, Function}}))
+function quadrants(pxest, quad_fn::Function)
+  @p8est iterator(pxest, quad_fn, C_NULL, C_NULL, C_NULL)
+  @p4est iterator(pxest, quad_fn, C_NULL, C_NULL)
+end
+
+function faces(face_fn::Function, pxest)
+  faces(pxest, face_fn)
+end
+
+function faces(pxest, face_fn::Function)
+  @p8est iterator(pxest, C_NULL, face_fn, C_NULL, C_NULL)
+  @p4est iterator(pxest, C_NULL, face_fn, C_NULL)
+end
+
+@p8est function edges(edge_fn::Function, pxest)
+  edges(pxest, edge_fn)
+end
+
+@p8est function edges(pxest, edge_fn::Function)
+  iterator(pxest, C_NULL, C_NULL, edge_fn, C_NULL)
+end
+
+function corners(corn_fn::Function, pxest)
+  corners(pxest, corn_fn)
+end
+
+function corners(pxest, corn_fn::Function)
+  @p8est iterator(pxest, C_NULL, C_NULL, C_NULL, corn_fn)
+  @p4est iterator(pxest, C_NULL, C_NULL, corn_fn)
+end
+
+@p4est function iterator(pxest, quad_fn, face_fn, corn_fn)
+  println(typeof(pxest))
+  iterator_call(pxest,
+                quad_fn == C_NULL ? C_NULL : (x, y)->begin
+                  quad_fn(x)
+                  nothing
+                end,
+                face_fn == C_NULL ? C_NULL : (x, y)->begin
+                  face_fn(x)
+                  nothing
+                end,
+                C_NULL,
+                corn_fn == C_NULL ? C_NULL : (x, y)->begin
+                  corn_fn(x)
+                  nothing
+                end)
+end
+
+@p8est function iterator(pxest, quad_fn, face_fn, edge_fn, corn_fn)
+  iterator_call(pxest,
+                quad_fn == C_NULL ? C_NULL : (x, y)->begin
+                  quad_fn(x)
+                  nothing
+                end,
+                face_fn == C_NULL ? C_NULL : (x, y)->begin
+                  face_fn(x)
+                  nothing
+                end,
+                edge_fn == C_NULL ? C_NULL : (x, y)->begin
+                  edge_fn(x)
+                  nothing
+                end,
+                corn_fn == C_NULL ? C_NULL : (x, y)->begin
+                  corn_fn(x)
+                  nothing
+                end)
+end
+
+function iterator_call(pxest, quad_fn, face_fn, edge_fn, corn_fn)
+  println(typeof(pxest)) ## TODO: Remove once compiler fixed
+  if quad_fn != C_NULL
+    quad_fn_ptr = @cfunction($quad_fn, Cvoid, (Ref{pxest_iter_volume_info_t},
+                                               Ptr{Cvoid}))
+  else
+    quad_fn_ptr = C_NULL
+  end
+  if face_fn != C_NULL
+    face_fn_ptr = @cfunction($face_fn, Cvoid, (Ref{pxest_iter_face_info_t},
+                                               Ptr{Cvoid}))
+  else
+    face_fn_ptr = C_NULL
+  end
+  @p8est if edge_fn != C_NULL
+    edge_fn_ptr = @cfunction($edge_fn, Cvoid, (Ref{pxest_iter_edge_info_t},
+                                               Ptr{Cvoid}))
+  else
+    edge_fn_ptr = C_NULL
+  end
+  if corn_fn != C_NULL
+    corn_fn_ptr = @cfunction($corn_fn, Cvoid, (Ref{pxest_iter_corner_info_t},
+                                               Ptr{Cvoid}))
+  else
+    corn_fn_ptr = C_NULL
+  end
 
   @p4est ccall(PXEST_ITERATE, Cvoid, (Ref{pxest_t}, Ptr{pxest_ghost_t},
-                                      Ref{Tuple{PXEST, Function}},
-                               Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cvoid}),
-               pxest.pxest, C_NULL, (pxest, vol_fn), quad_fn, C_NULL, C_NULL)
-
-  @p8est ccall(PXEST_ITERATE, Cvoid, (Ref{pxest_t}, Ptr{pxest_ghost_t},
-                                      Ref{Tuple{PXEST, Function}},
                                       Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cvoid},
                                       Ptr{Cvoid}),
-               pxest.pxest, C_NULL, (pxest, vol_fn), quad_fn, C_NULL,
-               C_NULL, C_NULL)
+               pxest.pxest, C_NULL, C_NULL, quad_fn_ptr, face_fn_ptr,
+               corn_fn_ptr)
+
+  @p8est ccall(PXEST_ITERATE, Cvoid, (Ref{pxest_t}, Ptr{pxest_ghost_t},
+                                      Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cvoid},
+                                      Ptr{Cvoid}, Ptr{Cvoid}),
+               pxest.pxest, C_NULL, C_NULL, quad_fn_ptr, face_fn_ptr,
+               edge_fn_ptr, corn_fn_ptr)
 end
 
 

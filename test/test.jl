@@ -40,6 +40,38 @@ let
     mv(string(vtk_dir, "/", vtk_base, ".visit"), string(vtk_base, ".visit"),
       force=true)
   end
+
+  # Count quadrants, faces, and corners separately
+  q = 0
+  p4est.quadrants(pxest) do quad
+    q = q+1
+  end
+  f = 0
+  p4est.faces(pxest) do face
+    f = f+1
+  end
+  e = 0
+  c = 0
+  p4est.corners(pxest) do corn
+    c = c+1
+  end
+  println((q, f, e, c))
+
+  # Count quadrants, faces, and corners together
+  q = 0
+  f = 0
+  c = 0
+  p4est.iterator(pxest,
+                 (x,)->begin
+                   q+=1
+                 end,
+                 (x,)->begin
+                   f+=1
+                 end,
+                 (x,)->begin
+                   c+=1
+                 end)
+  println((q, f, c))
 end
 
 using Pxest.p8est
@@ -71,11 +103,43 @@ let
       force=true)
   end
 
+  # Count quadrants, faces, edges, and corners separately
   q = 0
-  p8est.quadrants(pxest) do
-    println(q)
+  p8est.quadrants(pxest) do quad
     q = q+1
   end
+  f = 0
+  p8est.faces(pxest) do face
+    f = f+1
+  end
+  e = 0
+  p8est.edges(pxest) do edge
+    e = e+1
+  end
+  c = 0
+  p8est.corners(pxest) do corn
+    c = c+1
+  end
+  println((q, f, e, c))
+
+  # Count quadrants, faces, edges, and corners together
+  q = 0
+  f = 0
+  e = 0
+  c = 0
+  p8est.iterator(pxest,
+                 (x,)->begin
+                   q+=1
+                 end,
+                 (x,)->begin
+                   f+=1
+                 end,
+                 (x,)->begin
+                   e+=1
+                 end,
+                 (x,)->begin
+                   c+=1
+                 end)
 end
 
 if !isinteractive()
