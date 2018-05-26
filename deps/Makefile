@@ -26,7 +26,8 @@ endif
 
 all:
 	tar xzf downloads/p4est-*.tar.gz && mv p4est-* p4est
-	cd p4est && ./configure CC=$(CC) CXX=$(CXX) F77=$(F77) FC=$(FC) --enable-mpi --enable-debug --without-blas \
+	cd p4est && patch -p1 < ../p4est.patch \
+           && ./configure CC=$(CC) CXX=$(CXX) F77=$(F77) FC=$(FC) --enable-mpi --enable-debug --without-blas \
            && $(MAKE) install
 
 realclean:
