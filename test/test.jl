@@ -1,4 +1,5 @@
 using MPI
+using Random
 
 if !MPI.Initialized()
   MPI.Init()
