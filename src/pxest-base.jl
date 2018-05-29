@@ -392,12 +392,11 @@ function partition!(pxest; allow_for_coarsening=true)
         pxest.pxest, allow_for_coarsening, C_NULL)
 end
 
-# FIXME: Use keyword arguments
-function refine!(refine_fn::Function, pxest::PXEST, maxlevel=-1, refine_recursive=1)
+function refine!(refine_fn::Function, pxest::PXEST; maxlevel=-1, refine_recursive=1)
   refine_call!(pxest, (x,y,z)->refine_fn(y,z), maxlevel, refine_recursive)
 end
 
-function refine!(pxest::PXEST, refine_fn::Function, maxlevel=-1, refine_recursive=1)
+function refine!(pxest::PXEST, refine_fn::Function; maxlevel=-1, refine_recursive=1)
   refine_call!(pxest, (x,y,z)->refine_fn(y,z), maxlevel, refine_recursive)
 end
 

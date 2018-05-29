@@ -15,7 +15,7 @@ using Pxest.p4est
 let
   conn = p4est.Connectivity(5,7)
   pxest = p4est.PXEST(conn; min_lvl=0)
-  p4est.refine!(pxest, 3) do which_tree, quadrant
+  p4est.refine!(pxest; maxlevel=3) do which_tree, quadrant
     if rand() > 0.9
       return Cint(1)
     else
@@ -77,7 +77,7 @@ using Pxest.p8est
 let
   conn = p8est.Connectivity(5,7,2)
   pxest = p8est.PXEST(conn; min_lvl=0)
-  p8est.refine!(pxest, 3) do which_tree, quadrant
+  p8est.refine!(pxest; maxlevel=3) do which_tree, quadrant
     if rand() > 0.9
       return Cint(1)
     else
