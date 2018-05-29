@@ -1,4 +1,5 @@
 using MPI
+using Libdl
 
 # Path to the library
 const libsc = joinpath(dirname(@__FILE__), "../deps/p4est/local/lib/libsc.dylib")
