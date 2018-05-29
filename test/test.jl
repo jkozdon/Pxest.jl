@@ -1,6 +1,4 @@
 using MPI
-using Compat.Random
-using Compat.GC
 
 if !MPI.Initialized()
   MPI.Init()

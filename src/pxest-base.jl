@@ -1,6 +1,4 @@
-using Compat.Libdl
 using MPI
-using Compat
 
 # Path to the library
 const libsc = joinpath(dirname(@__FILE__), "../deps/p4est/local/lib/libsc.dylib")
@@ -212,7 +210,7 @@ mutable struct Connectivity
                                  (PXEST_CHILDREN, Int(num_trees)))
     this = new(num_vertices, num_trees, vertices, tree_to_vertex,
                pxest_conn_ptr)
-    @compat finalizer(connectivity_destroy, this)
+    finalizer(connectivity_destroy, this)
     return this
   end
 end
@@ -370,7 +368,7 @@ mutable struct PXEST
           C_NULL, C_NULL)
 
     this = new(pxest, conn, C_NULL)
-    @compat finalizer(pxest_destroy, this)
+    finalizer(pxest_destroy, this)
     return this
   end
 end
