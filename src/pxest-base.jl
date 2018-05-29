@@ -402,7 +402,6 @@ function refine!(pxest::PXEST, refine_fn::Function, maxlevel=-1, refine_recursiv
 end
 
 function refine_call!(pxest::PXEST, refine_fn, maxlevel, refine_recursive)
-  println(typeof(pxest)) ## TODO: Remove once compiler fixed
   refine_fn_c = @cfunction($refine_fn, Cint, (Ref{pxest_t}, pxest_topidx_t,
                                                   Ref{pxest_quadrant_t}))
   ccall(PXEST_REFINE_EXT, Cvoid,
@@ -515,7 +514,6 @@ end
 end
 
 function iterator_call(pxest, quad_fn, face_fn, edge_fn, corn_fn)
-  println(typeof(pxest)) ## TODO: Remove once compiler fixed
   if quad_fn != C_NULL
     quad_fn_ptr = @cfunction($quad_fn, Cvoid, (Ref{pxest_iter_volume_info_t},
                                                Ptr{Cvoid}))
