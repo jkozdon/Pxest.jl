@@ -40,6 +40,7 @@ let
       force=true)
   end
 
+  #=
   # Count quadrants, faces, and corners separately
   q = 0
   p4est.quadrants(pxest) do quad
@@ -71,6 +72,7 @@ let
                    c+=1
                  end)
   println((q, f, c))
+  =#
 end
 
 using Pxest.p8est
@@ -102,6 +104,7 @@ let
       force=true)
   end
 
+  #=
   # Count quadrants, faces, edges, and corners separately
   q = 0
   p8est.quadrants(pxest) do quad
@@ -139,6 +142,8 @@ let
                  (corn,)->begin
                    c+=1
                  end)
+  println(length(pxest))
+  =#
 end
 
 if !isinteractive()
