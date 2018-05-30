@@ -1,180 +1,291 @@
-diff -crB p4est/src/p4est.c p4est_update/src/p4est.c
-*** p4est/src/p4est.c	2016-09-08 12:15:06.000000000 -0700
---- p4est_update/src/p4est.c	2018-05-25 19:29:06.000000000 -0700
-***************
-*** 201,206 ****
---- 201,219 ----
-                 p4est_locidx_t min_quadrants, int min_level, int fill_uniform,
-                 size_t data_size, p4est_init_t init_fn, void *user_pointer)
-  {
-+   p4est_t * p4est;
-+   p4est = P4EST_ALLOC_ZERO (p4est_t, 1);
-+   p4est_init_ext (p4est, mpicomm, connectivity, 0, 0, 1,
-+                   data_size, init_fn, user_pointer);
-+   return p4est;
-+ }
-+ 
-+ void
-+ p4est_init_ext (p4est_t * p4est, sc_MPI_Comm mpicomm,
-+                 p4est_connectivity_t * connectivity,
-+                 p4est_locidx_t min_quadrants, int min_level, int fill_uniform,
-+                 size_t data_size, p4est_init_t init_fn, void *user_pointer)
-+ {
-    int                 num_procs, rank;
-    int                 i, must_remove_last_quadrant;
-    int                 level;
-***************
-*** 210,216 ****
-    p4est_gloidx_t      first_tree, first_quadrant, first_tree_quadrant;
-    p4est_gloidx_t      last_tree, last_quadrant, last_tree_quadrant;
-    p4est_gloidx_t      quadrant_index;
--   p4est_t            *p4est;
-    p4est_tree_t       *tree;
-    p4est_quadrant_t   *quad;
-    p4est_quadrant_t    a, b, c;
---- 223,228 ----
-***************
-*** 227,233 ****
-    P4EST_ASSERT (min_level <= P4EST_QMAXLEVEL);
-  
-    /* create p4est object and assign some data members */
-!   p4est = P4EST_ALLOC_ZERO (p4est_t, 1);
-    p4est->data_size = data_size;
-    p4est->user_pointer = user_pointer;
-    p4est->connectivity = connectivity;
---- 239,245 ----
-    P4EST_ASSERT (min_level <= P4EST_QMAXLEVEL);
-  
-    /* create p4est object and assign some data members */
-!   memset(p4est, 0, sizeof(p4est_t));
-    p4est->data_size = data_size;
-    p4est->user_pointer = user_pointer;
-    p4est->connectivity = connectivity;
-***************
-*** 491,502 ****
-    P4EST_GLOBAL_PRODUCTIONF ("Done " P4EST_STRING
-                              "_new with %lld total quadrants\n",
-                              (long long) p4est->global_num_quadrants);
--   return p4est;
-  }
-  
-  void
-  p4est_destroy (p4est_t * p4est)
-  {
-  #ifdef P4EST_ENABLE_DEBUG
-    size_t              qz;
-  #endif
---- 503,519 ----
-    P4EST_GLOBAL_PRODUCTIONF ("Done " P4EST_STRING
-                              "_new with %lld total quadrants\n",
-                              (long long) p4est->global_num_quadrants);
-  }
-  
-  void
-  p4est_destroy (p4est_t * p4est)
-  {
-+   p4est_destroy_ext (p4est, 0 == 0);
-+ }
-+ 
-+ void
-+ p4est_destroy_ext (p4est_t * p4est, int free_p4est)
-+ {
-  #ifdef P4EST_ENABLE_DEBUG
-    size_t              qz;
-  #endif
-***************
-*** 526,532 ****
-    p4est_comm_parallel_env_release (p4est);
-    P4EST_FREE (p4est->global_first_quadrant);
-    P4EST_FREE (p4est->global_first_position);
-!   P4EST_FREE (p4est);
-  }
-  
-  p4est_t            *
---- 543,550 ----
-    p4est_comm_parallel_env_release (p4est);
-    P4EST_FREE (p4est->global_first_quadrant);
-    P4EST_FREE (p4est->global_first_position);
-!   if( free_p4est)
-!     P4EST_FREE (p4est);
-  }
-  
-  p4est_t            *
-diff -crB p4est/src/p4est_extended.h p4est_update/src/p4est_extended.h
-*** p4est/src/p4est_extended.h	2016-09-08 12:15:06.000000000 -0700
---- p4est_update/src/p4est_extended.h	2018-05-25 19:29:06.000000000 -0700
-***************
-*** 130,135 ****
---- 130,155 ----
-                                     size_t data_size, p4est_init_t init_fn,
-                                     void *user_pointer);
-  
-+ /** Initialize an already allocated forest
-+  * See the documentation of p4est_new_ext for basic usage.
-+  *
-+  * \param [in] p4est  p4est to initialize
-+  */
-+ void                p4est_init_ext (p4est_t * p4est,
-+                                     sc_MPI_Comm mpicomm,
-+                                     p4est_connectivity_t * connectivity,
-+                                     p4est_locidx_t min_quadrants,
-+                                     int min_level, int fill_uniform,
-+                                     size_t data_size, p4est_init_t init_fn,
-+                                     void *user_pointer);
-+ 
-+ /** Destroy a p4est.
-+  * See the documentation of p4est_destroy for basic usage.
-+  *
-+  * \param [in] destroy_p4est  bool on whether to free p4est
-+  */
-+ void                p4est_destroy_ext (p4est_t * p4est, int free_p4est);
-+ 
-  /** Create a new mesh.
-   * \param [in] p4est                A forest that is fully 2:1 balanced.
-   * \param [in] ghost                The ghost layer created from the
-diff -crB p4est/src/p4est_to_p8est.h p4est_update/src/p4est_to_p8est.h
-*** p4est/src/p4est_to_p8est.h	2016-09-08 12:15:06.000000000 -0700
---- p4est_update/src/p4est_to_p8est.h	2018-05-25 19:29:07.000000000 -0700
-***************
-*** 178,183 ****
---- 178,185 ----
-  /* functions in p4est_extended */
-  #define p4est_replace_t                 p8est_replace_t
-  #define p4est_new_ext                   p8est_new_ext
-+ #define p4est_init_ext                  p8est_init_ext
-+ #define p4est_destroy_ext               p8est_destroy_ext
-  #define p4est_mesh_new_ext              p8est_mesh_new_ext
-  #define p4est_copy_ext                  p8est_copy_ext
-  #define p4est_refine_ext                p8est_refine_ext
-diff -crB p4est/src/p8est_extended.h p4est_update/src/p8est_extended.h
-*** p4est/src/p8est_extended.h	2016-09-08 12:15:06.000000000 -0700
---- p4est_update/src/p8est_extended.h	2018-05-25 19:29:07.000000000 -0700
-***************
-*** 130,135 ****
---- 130,155 ----
-                                     size_t data_size, p8est_init_t init_fn,
-                                     void *user_pointer);
-  
-+ /** Initialize an already allocated forest
-+  * See the documentation of p8est_new_ext for basic usage.
-+  *
-+  * \param [in] p8est  p8est to initialize
-+  */
-+ void                p8est_init_ext (p8est_t * p8est,
-+                                     sc_MPI_Comm mpicomm,
-+                                     p8est_connectivity_t * connectivity,
-+                                     p4est_locidx_t min_quadrants,
-+                                     int min_level, int fill_uniform,
-+                                     size_t data_size, p8est_init_t init_fn,
-+                                     void *user_pointer);
-+ 
-+ /** Destroy a p8est.
-+  * See the documentation of p8est_destroy for basic usage.
-+  *
-+  * \param [in] destroy_p8est  bool on whether to free p8est
-+  */
-+ void                p8est_destroy_ext (p8est_t * p8est, int free_p8est);
-+ 
-  /** Create a new mesh.
-   * \param [in] p8est                A forest that is fully 2:1 balanced.
-   * \param [in] ghost                The ghost layer created from the
+diff -Naur p4est-orig/src/p4est.c p4est-update/src/p4est.c
+--- p4est-orig/src/p4est.c	2016-09-08 12:15:06.000000000 -0700
++++ p4est-update/src/p4est.c	2018-05-30 13:24:21.000000000 -0700
+@@ -201,6 +201,19 @@
+                p4est_locidx_t min_quadrants, int min_level, int fill_uniform,
+                size_t data_size, p4est_init_t init_fn, void *user_pointer)
+ {
++  p4est_t * p4est;
++  p4est = P4EST_ALLOC_ZERO (p4est_t, 1);
++  p4est_init_ext (p4est, mpicomm, connectivity, 0, 0, 1,
++                  data_size, init_fn, user_pointer);
++  return p4est;
++}
++
++void
++p4est_init_ext (p4est_t * p4est, sc_MPI_Comm mpicomm,
++                p4est_connectivity_t * connectivity,
++                p4est_locidx_t min_quadrants, int min_level, int fill_uniform,
++                size_t data_size, p4est_init_t init_fn, void *user_pointer)
++{
+   int                 num_procs, rank;
+   int                 i, must_remove_last_quadrant;
+   int                 level;
+@@ -210,7 +223,6 @@
+   p4est_gloidx_t      first_tree, first_quadrant, first_tree_quadrant;
+   p4est_gloidx_t      last_tree, last_quadrant, last_tree_quadrant;
+   p4est_gloidx_t      quadrant_index;
+-  p4est_t            *p4est;
+   p4est_tree_t       *tree;
+   p4est_quadrant_t   *quad;
+   p4est_quadrant_t    a, b, c;
+@@ -227,7 +239,7 @@
+   P4EST_ASSERT (min_level <= P4EST_QMAXLEVEL);
+ 
+   /* create p4est object and assign some data members */
+-  p4est = P4EST_ALLOC_ZERO (p4est_t, 1);
++  memset(p4est, 0, sizeof(p4est_t));
+   p4est->data_size = data_size;
+   p4est->user_pointer = user_pointer;
+   p4est->connectivity = connectivity;
+@@ -491,12 +503,17 @@
+   P4EST_GLOBAL_PRODUCTIONF ("Done " P4EST_STRING
+                             "_new with %lld total quadrants\n",
+                             (long long) p4est->global_num_quadrants);
+-  return p4est;
+ }
+ 
+ void
+ p4est_destroy (p4est_t * p4est)
+ {
++  p4est_destroy_ext (p4est, 0 == 0);
++}
++
++void
++p4est_destroy_ext (p4est_t * p4est, int free_p4est)
++{
+ #ifdef P4EST_ENABLE_DEBUG
+   size_t              qz;
+ #endif
+@@ -526,7 +543,8 @@
+   p4est_comm_parallel_env_release (p4est);
+   P4EST_FREE (p4est->global_first_quadrant);
+   P4EST_FREE (p4est->global_first_position);
+-  P4EST_FREE (p4est);
++  if( free_p4est)
++    P4EST_FREE (p4est);
+ }
+ 
+ p4est_t            *
+@@ -3750,3 +3768,51 @@
+ 
+   return p4est;
+ }
++
++/* Handful of helper functions for Julia */
++size_t p4est_julia_sizeof_quadrant_t()
++{
++  return sizeof(p4est_quadrant_t);
++}
++
++p4est_topidx_t
++p4est_julia_quadrant_p_which_tree(p4est_quadrant_t * quad)
++{
++  return quad->p.which_tree;
++}
++
++p4est_topidx_t
++p4est_julia_quadrant_p_piggy1_which_tree(p4est_quadrant_t * quad)
++{
++  return quad->p.piggy1.which_tree;
++}
++
++int
++p4est_julia_quadrant_p_piggy1_owner_rank(p4est_quadrant_t * quad)
++{
++  return quad->p.piggy1.owner_rank;
++}
++
++p4est_topidx_t
++p4est_julia_quadrant_p_piggy2_which_tree(p4est_quadrant_t * quad)
++{
++  return quad->p.piggy2.which_tree;
++}
++
++p4est_topidx_t
++p4est_julia_quadrant_p_piggy2_from_tree(p4est_quadrant_t * quad)
++{
++  return quad->p.piggy2.from_tree;
++}
++
++p4est_topidx_t
++p4est_julia_quadrant_p_piggy3_which_tree(p4est_quadrant_t * quad)
++{
++  return quad->p.piggy3.which_tree;
++}
++
++p4est_locidx_t
++p4est_julia_quadrant_p_piggy3_local_num(p4est_quadrant_t * quad)
++{
++  return quad->p.piggy3.local_num;
++}
+diff -Naur p4est-orig/src/p4est.h p4est-update/src/p4est.h
+--- p4est-orig/src/p4est.h	2016-09-08 12:15:06.000000000 -0700
++++ p4est-update/src/p4est.h	2018-05-30 13:24:21.000000000 -0700
+@@ -490,6 +490,34 @@
+   return (p4est_quadrant_t *) sc_list_pop (list);
+ }
+ 
++/* Handful of helper functions for Julia */
++/** Return the size of a p4est_quadrant_t
++ *
++ * \return          sizeof(p4est_quadrant_t)
++ */
++size_t p4est_julia_sizeof_quadrant_t();
++
++p4est_topidx_t
++p4est_julia_quadrant_p_which_tree(p4est_quadrant_t * quad);
++
++p4est_topidx_t
++p4est_julia_quadrant_p_piggy1_which_tree(p4est_quadrant_t * quad);
++
++int
++p4est_julia_quadrant_p_piggy1_owner_rank(p4est_quadrant_t * quad);
++
++p4est_topidx_t
++p4est_julia_quadrant_p_piggy2_which_tree(p4est_quadrant_t * quad);
++
++p4est_topidx_t
++p4est_julia_quadrant_p_piggy2_from_tree(p4est_quadrant_t * quad);
++
++p4est_topidx_t
++p4est_julia_quadrant_p_piggy3_which_tree(p4est_quadrant_t * quad);
++
++p4est_locidx_t
++p4est_julia_quadrant_p_piggy3_local_num(p4est_quadrant_t * quad);
++
+ SC_EXTERN_C_END;
+ 
+ #endif /* !P4EST_H */
+diff -Naur p4est-orig/src/p4est_extended.h p4est-update/src/p4est_extended.h
+--- p4est-orig/src/p4est_extended.h	2016-09-08 12:15:06.000000000 -0700
++++ p4est-update/src/p4est_extended.h	2018-05-30 13:24:21.000000000 -0700
+@@ -130,6 +130,26 @@
+                                    size_t data_size, p4est_init_t init_fn,
+                                    void *user_pointer);
+ 
++/** Initialize an already allocated forest
++ * See the documentation of p4est_new_ext for basic usage.
++ *
++ * \param [in] p4est  p4est to initialize
++ */
++void                p4est_init_ext (p4est_t * p4est,
++                                    sc_MPI_Comm mpicomm,
++                                    p4est_connectivity_t * connectivity,
++                                    p4est_locidx_t min_quadrants,
++                                    int min_level, int fill_uniform,
++                                    size_t data_size, p4est_init_t init_fn,
++                                    void *user_pointer);
++
++/** Destroy a p4est.
++ * See the documentation of p4est_destroy for basic usage.
++ *
++ * \param [in] destroy_p4est  bool on whether to free p4est
++ */
++void                p4est_destroy_ext (p4est_t * p4est, int free_p4est);
++
+ /** Create a new mesh.
+  * \param [in] p4est                A forest that is fully 2:1 balanced.
+  * \param [in] ghost                The ghost layer created from the
+diff -Naur p4est-orig/src/p4est_to_p8est.h p4est-update/src/p4est_to_p8est.h
+--- p4est-orig/src/p4est_to_p8est.h	2016-09-08 12:15:06.000000000 -0700
++++ p4est-update/src/p4est_to_p8est.h	2018-05-30 13:24:21.000000000 -0700
+@@ -110,6 +110,21 @@
+ #define p4est_wrap_leaf_t               p8est_wrap_leaf_t
+ #define p4est_wrap_flags_t              p8est_wrap_flags_t
+ #define p4est_vtk_context_t             p8est_vtk_context_t
++#define p4est_julia_sizeof_quadrant_t   p8est_julia_sizeof_quadrant_t
++#define p4est_julia_quadrant_p_which_tree \
++        p8est_julia_quadrant_p_which_tree
++#define p4est_julia_quadrant_p_piggy1_which_tree \
++        p8est_julia_quadrant_p_piggy1_which_tree
++#define p4est_julia_quadrant_p_piggy1_owner_rank \
++        p8est_julia_quadrant_p_piggy1_owner_rank
++#define p4est_julia_quadrant_p_piggy2_which_tree \
++        p8est_julia_quadrant_p_piggy2_which_tree
++#define p4est_julia_quadrant_p_piggy2_from_tree \
++        p8est_julia_quadrant_p_piggy2_from_tree
++#define p4est_julia_quadrant_p_piggy3_which_tree \
++        p8est_julia_quadrant_p_piggy3_which_tree
++#define p4est_julia_quadrant_p_piggy3_local_num \
++        p8est_julia_quadrant_p_piggy3_local_num
+ 
+ /* redefine external variables */
+ #define p4est_face_corners              p8est_face_corners
+@@ -178,6 +193,8 @@
+ /* functions in p4est_extended */
+ #define p4est_replace_t                 p8est_replace_t
+ #define p4est_new_ext                   p8est_new_ext
++#define p4est_init_ext                  p8est_init_ext
++#define p4est_destroy_ext               p8est_destroy_ext
+ #define p4est_mesh_new_ext              p8est_mesh_new_ext
+ #define p4est_copy_ext                  p8est_copy_ext
+ #define p4est_refine_ext                p8est_refine_ext
+diff -Naur p4est-orig/src/p8est.h p4est-update/src/p8est.h
+--- p4est-orig/src/p8est.h	2016-09-08 12:15:06.000000000 -0700
++++ p4est-update/src/p8est.h	2018-05-30 13:24:21.000000000 -0700
+@@ -490,6 +490,34 @@
+   return (p8est_quadrant_t *) sc_list_pop (list);
+ }
+ 
++/* Handful of helper functions for Julia */
++/** Return the size of a p8est_quadrant_t
++ *
++ * \return          sizeof(p8est_quadrant_t)
++ */
++size_t p8est_julia_sizeof_quadrant_t();
++
++p4est_topidx_t
++p8est_julia_quadrant_p_which_tree(p8est_quadrant_t * quad);
++
++p4est_topidx_t
++p8est_julia_quadrant_p_piggy1_which_tree(p8est_quadrant_t * quad);
++
++int
++p8est_julia_quadrant_p_piggy1_owner_rank(p8est_quadrant_t * quad);
++
++p4est_topidx_t
++p8est_julia_quadrant_p_piggy2_which_tree(p8est_quadrant_t * quad);
++
++p4est_topidx_t
++p8est_julia_quadrant_p_piggy2_from_tree(p8est_quadrant_t * quad);
++
++p4est_topidx_t
++p8est_julia_quadrant_p_piggy3_which_tree(p8est_quadrant_t * quad);
++
++p4est_locidx_t
++p8est_julia_quadrant_p_piggy3_local_num(p8est_quadrant_t * quad);
++
+ SC_EXTERN_C_END;
+ 
+ #endif /* !P8EST_H */
+diff -Naur p4est-orig/src/p8est_extended.h p4est-update/src/p8est_extended.h
+--- p4est-orig/src/p8est_extended.h	2016-09-08 12:15:06.000000000 -0700
++++ p4est-update/src/p8est_extended.h	2018-05-30 13:24:21.000000000 -0700
+@@ -130,6 +130,26 @@
+                                    size_t data_size, p8est_init_t init_fn,
+                                    void *user_pointer);
+ 
++/** Initialize an already allocated forest
++ * See the documentation of p8est_new_ext for basic usage.
++ *
++ * \param [in] p8est  p8est to initialize
++ */
++void                p8est_init_ext (p8est_t * p8est,
++                                    sc_MPI_Comm mpicomm,
++                                    p8est_connectivity_t * connectivity,
++                                    p4est_locidx_t min_quadrants,
++                                    int min_level, int fill_uniform,
++                                    size_t data_size, p8est_init_t init_fn,
++                                    void *user_pointer);
++
++/** Destroy a p8est.
++ * See the documentation of p8est_destroy for basic usage.
++ *
++ * \param [in] destroy_p8est  bool on whether to free p8est
++ */
++void                p8est_destroy_ext (p8est_t * p8est, int free_p8est);
++
+ /** Create a new mesh.
+  * \param [in] p8est                A forest that is fully 2:1 balanced.
+  * \param [in] ghost                The ghost layer created from the
