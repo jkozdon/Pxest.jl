@@ -87,7 +87,6 @@ mutable struct Mesh
       MToE[Me] = UMToE[mirror_proc_mirrors[Me]+1]
     end
 
-    println(mesh)
     mesh
   end
 end
