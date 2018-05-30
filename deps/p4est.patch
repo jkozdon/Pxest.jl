@@ -1,6 +1,6 @@
 diff -Naur p4est-orig/src/p4est.c p4est-update/src/p4est.c
 --- p4est-orig/src/p4est.c	2016-09-08 12:15:06.000000000 -0700
-+++ p4est-update/src/p4est.c	2018-05-30 13:24:21.000000000 -0700
++++ p4est-update/src/p4est.c	2018-05-30 16:08:01.000000000 -0700
 @@ -201,6 +201,19 @@
                 p4est_locidx_t min_quadrants, int min_level, int fill_uniform,
                 size_t data_size, p4est_init_t init_fn, void *user_pointer)
@@ -121,7 +121,7 @@ diff -Naur p4est-orig/src/p4est.c p4est-update/src/p4est.c
 +}
 diff -Naur p4est-orig/src/p4est.h p4est-update/src/p4est.h
 --- p4est-orig/src/p4est.h	2016-09-08 12:15:06.000000000 -0700
-+++ p4est-update/src/p4est.h	2018-05-30 13:24:21.000000000 -0700
++++ p4est-update/src/p4est.h	2018-05-30 16:08:01.000000000 -0700
 @@ -490,6 +490,34 @@
    return (p4est_quadrant_t *) sc_list_pop (list);
  }
@@ -159,7 +159,7 @@ diff -Naur p4est-orig/src/p4est.h p4est-update/src/p4est.h
  #endif /* !P4EST_H */
 diff -Naur p4est-orig/src/p4est_extended.h p4est-update/src/p4est_extended.h
 --- p4est-orig/src/p4est_extended.h	2016-09-08 12:15:06.000000000 -0700
-+++ p4est-update/src/p4est_extended.h	2018-05-30 13:24:21.000000000 -0700
++++ p4est-update/src/p4est_extended.h	2018-05-30 16:08:01.000000000 -0700
 @@ -130,6 +130,26 @@
                                     size_t data_size, p4est_init_t init_fn,
                                     void *user_pointer);
@@ -187,10 +187,43 @@ diff -Naur p4est-orig/src/p4est_extended.h p4est-update/src/p4est_extended.h
  /** Create a new mesh.
   * \param [in] p4est                A forest that is fully 2:1 balanced.
   * \param [in] ghost                The ghost layer created from the
+diff -Naur p4est-orig/src/p4est_iterate.c p4est-update/src/p4est_iterate.c
+--- p4est-orig/src/p4est_iterate.c	2016-09-08 12:15:06.000000000 -0700
++++ p4est-update/src/p4est_iterate.c	2018-05-30 16:08:01.000000000 -0700
+@@ -3308,3 +3308,17 @@
+ #endif
+                      iter_corner, 0);
+ }
++
++size_t
++p4est_julia_sizeof_iter_face_side_t()
++{
++  return sizeof(p4est_iter_face_side_t);
++}
++
++#ifdef P4_TO_P8
++size_t
++p8est_julia_sizeof_iter_edge_side_t()
++{
++  return sizeof(p8est_iter_edge_side_t);
++}
++#endif
+diff -Naur p4est-orig/src/p4est_iterate.h p4est-update/src/p4est_iterate.h
+--- p4est-orig/src/p4est_iterate.h	2016-09-08 12:15:06.000000000 -0700
++++ p4est-update/src/p4est_iterate.h	2018-05-30 16:08:01.000000000 -0700
+@@ -289,6 +289,8 @@
+     (array->array + sizeof (p4est_iter_face_side_t) * it);
+ }
+ 
++size_t p4est_julia_sizeof_iter_face_side_t();
++
+ SC_EXTERN_C_END;
+ 
+ #endif /* !P4EST_ITERATE_H */
 diff -Naur p4est-orig/src/p4est_to_p8est.h p4est-update/src/p4est_to_p8est.h
 --- p4est-orig/src/p4est_to_p8est.h	2016-09-08 12:15:06.000000000 -0700
-+++ p4est-update/src/p4est_to_p8est.h	2018-05-30 13:24:21.000000000 -0700
-@@ -110,6 +110,21 @@
++++ p4est-update/src/p4est_to_p8est.h	2018-05-30 16:08:01.000000000 -0700
+@@ -110,6 +110,22 @@
  #define p4est_wrap_leaf_t               p8est_wrap_leaf_t
  #define p4est_wrap_flags_t              p8est_wrap_flags_t
  #define p4est_vtk_context_t             p8est_vtk_context_t
@@ -209,10 +242,11 @@ diff -Naur p4est-orig/src/p4est_to_p8est.h p4est-update/src/p4est_to_p8est.h
 +        p8est_julia_quadrant_p_piggy3_which_tree
 +#define p4est_julia_quadrant_p_piggy3_local_num \
 +        p8est_julia_quadrant_p_piggy3_local_num
++#define p4est_julia_sizeof_iter_face_side_t  p8est_julia_sizeof_iter_face_side_t
  
  /* redefine external variables */
  #define p4est_face_corners              p8est_face_corners
-@@ -178,6 +193,8 @@
+@@ -178,6 +194,8 @@
  /* functions in p4est_extended */
  #define p4est_replace_t                 p8est_replace_t
  #define p4est_new_ext                   p8est_new_ext
@@ -223,7 +257,7 @@ diff -Naur p4est-orig/src/p4est_to_p8est.h p4est-update/src/p4est_to_p8est.h
  #define p4est_refine_ext                p8est_refine_ext
 diff -Naur p4est-orig/src/p8est.h p4est-update/src/p8est.h
 --- p4est-orig/src/p8est.h	2016-09-08 12:15:06.000000000 -0700
-+++ p4est-update/src/p8est.h	2018-05-30 13:24:21.000000000 -0700
++++ p4est-update/src/p8est.h	2018-05-30 16:08:01.000000000 -0700
 @@ -490,6 +490,34 @@
    return (p8est_quadrant_t *) sc_list_pop (list);
  }
@@ -261,7 +295,7 @@ diff -Naur p4est-orig/src/p8est.h p4est-update/src/p8est.h
  #endif /* !P8EST_H */
 diff -Naur p4est-orig/src/p8est_extended.h p4est-update/src/p8est_extended.h
 --- p4est-orig/src/p8est_extended.h	2016-09-08 12:15:06.000000000 -0700
-+++ p4est-update/src/p8est_extended.h	2018-05-30 13:24:21.000000000 -0700
++++ p4est-update/src/p8est_extended.h	2018-05-30 16:08:01.000000000 -0700
 @@ -130,6 +130,26 @@
                                     size_t data_size, p8est_init_t init_fn,
                                     void *user_pointer);
@@ -289,3 +323,17 @@ diff -Naur p4est-orig/src/p8est_extended.h p4est-update/src/p8est_extended.h
  /** Create a new mesh.
   * \param [in] p8est                A forest that is fully 2:1 balanced.
   * \param [in] ghost                The ghost layer created from the
+diff -Naur p4est-orig/src/p8est_iterate.h p4est-update/src/p8est_iterate.h
+--- p4est-orig/src/p8est_iterate.h	2016-09-08 12:15:06.000000000 -0700
++++ p4est-update/src/p8est_iterate.h	2018-05-30 16:08:01.000000000 -0700
+@@ -399,6 +399,10 @@
+     (array->array + sizeof (p8est_iter_face_side_t) * it);
+ }
+ 
++
++size_t p8est_julia_sizeof_iter_face_side_t();
++size_t p8est_julia_sizeof_iter_edge_side_t();
++
+ SC_EXTERN_C_END;
+ 
+ #endif /* !P8EST_ITERATE_H */
