@@ -25,6 +25,22 @@ const libpxest = joinpath(dirname(@__FILE__), "../deps/p4est/local/lib/libp4est.
     :PXEST_VTK_WRITE_CELL_DATAF       => "p4est_vtk_write_cell_dataf",
     :PXEST_VTK_WRITE_FOOTER           => "p4est_vtk_write_footer",
     :PXEST_ITERATE                    => "p4est_iterate",
+    :PXEST_JULIA_QUADRANT_P_WHICH_TREE =>
+      "p4est_julia_quadrant_p_which_tree",
+    :PXEST_JULIA_QUADRANT_P_PIGGY1_WHICH_TREE =>
+      "p4est_julia_quadrant_p_piggy1_which_tree",
+    :PXEST_JULIA_QUADRANT_P_PIGGY1_OWNER_RANK =>
+      "p4est_julia_quadrant_p_piggy1_owner_rank",
+    :PXEST_JULIA_QUADRANT_P_PIGGY2_WHICH_TREE =>
+      "p4est_julia_quadrant_p_piggy2_which_tree",
+    :PXEST_JULIA_QUADRANT_P_PIGGY2_FROM_TREE  =>
+      "p4est_julia_quadrant_p_piggy2_from_tree",
+    :PXEST_JULIA_QUADRANT_P_PIGGY3_WHICH_TREE =>
+      "p4est_julia_quadrant_p_piggy3_which_tree",
+    :PXEST_JULIA_QUADRANT_P_PIGGY3_LOCAL_NUM  =>
+      "p4est_julia_quadrant_p_piggy3_local_num",
+    #TODO: Use this to set piggy size
+    :PXEST_JULIA_SIZEOF_QUADRANT_T    => "p4est_julia_sizeof_quadrant_t",
    )
 
 @p8est const _pxest_functions = Dict{Symbol, String}(
@@ -46,6 +62,22 @@ const libpxest = joinpath(dirname(@__FILE__), "../deps/p4est/local/lib/libp4est.
     :PXEST_VTK_WRITE_CELL_DATAF       => "p8est_vtk_write_cell_dataf",
     :PXEST_VTK_WRITE_FOOTER           => "p8est_vtk_write_footer",
     :PXEST_ITERATE                    => "p8est_iterate",
+    :PXEST_JULIA_QUADRANT_P_WHICH_TREE =>
+      "p8est_julia_quadrant_p_which_tree",
+    :PXEST_JULIA_QUADRANT_P_PIGGY1_WHICH_TREE =>
+      "p8est_julia_quadrant_p_piggy1_which_tree",
+    :PXEST_JULIA_QUADRANT_P_PIGGY1_OWNER_RANK =>
+      "p8est_julia_quadrant_p_piggy1_owner_rank",
+    :PXEST_JULIA_QUADRANT_P_PIGGY2_WHICH_TREE =>
+      "p8est_julia_quadrant_p_piggy2_which_tree",
+    :PXEST_JULIA_QUADRANT_P_PIGGY2_FROM_TREE  =>
+      "p8est_julia_quadrant_p_piggy2_from_tree",
+    :PXEST_JULIA_QUADRANT_P_PIGGY3_WHICH_TREE =>
+      "p8est_julia_quadrant_p_piggy3_which_tree",
+    :PXEST_JULIA_QUADRANT_P_PIGGY3_LOCAL_NUM  =>
+      "p8est_julia_quadrant_p_piggy3_local_num",
+    #TODO: Use this to set piggy size
+    :PXEST_JULIA_SIZEOF_QUADRANT_T    => "p8est_julia_sizeof_quadrant_t",
    )
 
 # Build symbols
@@ -71,12 +103,26 @@ end
 @p8est const PXEST_MAXLEVEL = 19
 const PXEST_ROOT_LEN = 1 << PXEST_MAXLEVEL
 
+struct sc_array_t{T}
+  # interface variables
+  elem_size::Csize_t  # size of a single element
+  elem_count::Csize_t # number of valid elements
+
+  # implementation variables
+  byte_alloc::Cssize_t # number of allocated bytes or
+                      # -(number of viewed bytes + 1)
+                      # if this is a view: the "+ 1"
+                      # distinguishes an array of size 0
+                      # from a view of size 0
+
+  array::Ptr{T}       # linear array to store elements
+end
+
 # Connectivity data structures
 const pxest_topidx_t = Int32
 const pxest_locidx_t = Int32
 const pxest_gloidx_t = Int64
 const pxest_qcoord_t = Int32
-const sc_array_t = Cvoid
 const sc_mempool_t = Cvoid
 const pxest_inspect_t = Cvoid
 const pxest_connect_type_t = Cuint
@@ -227,50 +273,6 @@ end
 #}}}
 
 #{{{ pxest data structure
-struct pxest_ghost_t
-  mpisize::Cint
-  num_trees::pxest_topidx_t
-  btype::pxest_connect_type_t # which neighbors are in the ghost layer
-
-  #=
-  # An array of quadrants which make up the ghost layer around \a
-  # p4est.  Their piggy3 data member is filled with their owner's tree
-  # and local number (cumulative over trees).  Quadrants are ordered in \c
-  # p4est_quadrant_compare_piggy order.  These are quadrants inside the
-  # neighboring tree, i.e., \c p4est_quadrant_is_inside() is true for the
-  # quadrant and the neighboring tree.
-  =#
-
-  ghosts::sc_array_t # array of p4est_quadrant_t type
-  tree_offsets::Ptr{pxest_locidx_t} # num_trees + 1 ghost indices
-  proc_offsets::Ptr{pxest_locidx_t} # mpisize + 1 ghost indices
-
-  #=
-  # An array of local quadrants that touch the parallel boundary from the
-  # inside, i.e., that are ghosts in the perspective of at least one other
-  # processor.  The storage convention is the same as for \c ghosts above.
-  =#
-  mirrors::sc_array_t # array of p4est_quadrant_t type
-  mirror_tree_offsets::Ptr{pxest_locidx_t} # num_trees + 1 mirror indices
-  #=
-  # indices into mirrors grouped by outside processor rank and ascending within
-  # each rank
-  =#
-  mirror_proc_mirrors::Ptr{pxest_locidx_t}
-
-  # mpisize + 1 indices into mirror_proc_mirrors
-  mirror_proc_offsets::Ptr{pxest_locidx_t}
-
-  #=
-  # like mirror_proc_mirrors, but limited to the outermost octants.  This is
-  # NULL until p4est_ghost_expand is called
-  =#
-  mirror_proc_fronts::Ptr{pxest_locidx_t}
-
-  # NULL until p4est_ghost_expand is called
-  mirror_proc_front_offsets::Ptr{pxest_locidx_t}
-end
-
 const piggy_size = max(sizeof(Ptr{Cvoid}),
                        sizeof(Clong),
                        sizeof(Cint),
@@ -291,6 +293,77 @@ struct pxest_quadrant_t
 
   # TODO: Figure out how to handle this better (How to cast?)
   piggy_data::NTuple{piggy_size, Cchar}
+  @p4est dummy::pxest_qcoord_t # FIXME: Is this correct???
+end
+
+struct pxest_ghost_t
+  mpisize::Cint
+  num_trees::pxest_topidx_t
+  btype::pxest_connect_type_t # which neighbors are in the ghost layer
+
+  #=
+  # An array of quadrants which make up the ghost layer around \a
+  # p4est.  Their piggy3 data member is filled with their owner's tree
+  # and local number (cumulative over trees).  Quadrants are ordered in \c
+  # p4est_quadrant_compare_piggy order.  These are quadrants inside the
+  # neighboring tree, i.e., \c p4est_quadrant_is_inside() is true for the
+  # quadrant and the neighboring tree.
+  =#
+
+  ghosts::sc_array_t{pxest_quadrant_t} # array of p4est_quadrant_t type
+  tree_offsets::Ptr{pxest_locidx_t} # num_trees + 1 ghost indices
+  proc_offsets::Ptr{pxest_locidx_t} # mpisize + 1 ghost indices
+
+  #=
+  # An array of local quadrants that touch the parallel boundary from the
+  # inside, i.e., that are ghosts in the perspective of at least one other
+  # processor.  The storage convention is the same as for \c ghosts above.
+  =#
+  mirrors::sc_array_t{pxest_quadrant_t} # array of p4est_quadrant_t type
+  mirror_tree_offsets::Ptr{pxest_locidx_t} # num_trees + 1 mirror indices
+  #=
+  # indices into mirrors grouped by outside processor rank and ascending within
+  # each rank
+  =#
+  mirror_proc_mirrors::Ptr{pxest_locidx_t}
+
+  # mpisize + 1 indices into mirror_proc_mirrors
+  mirror_proc_offsets::Ptr{pxest_locidx_t}
+
+  #=
+  # like mirror_proc_mirrors, but limited to the outermost octants.  This is
+  # NULL until p4est_ghost_expand is called
+  =#
+  mirror_proc_fronts::Ptr{pxest_locidx_t}
+
+  # NULL until p4est_ghost_expand is called
+  mirror_proc_front_offsets::Ptr{pxest_locidx_t}
+end
+
+
+function quadX(quad::pxest_quadrant_t)
+  quad.x
+end
+function quadY(quad::pxest_quadrant_t)
+  quad.y
+end
+@p8est function quadZ(quad::pxest_quadrant_t)
+  quad.z
+end
+function quadlevel(quad::pxest_quadrant_t)
+  quad.level
+end
+
+struct pxest_tree_t
+  quadrants::sc_array_t{pxest_quadrant_t} # locally stored quadrants
+  first_desc::pxest_quadrant_t            # first local descendant */
+  last_desc::pxest_quadrant_t             # last local descendant */
+
+  # cumulative sum over earlier trees on this processor (locals only)
+  quadrants_offset::pxest_locidx_t
+
+  quadrants_per_level::NTuple{PXEST_MAXLEVEL+1, pxest_locidx_t} # locals only
+  maxlevel::Int8                   # highest local quadrant level
 end
 
 mutable struct pxest_t
@@ -338,7 +411,7 @@ mutable struct pxest_t
   connectivity::Ptr{pxest_connectivity_t}
 
   # array of all trees
-  trees::Ptr{sc_array_t}
+  trees::Ptr{sc_array_t{pxest_tree_t}}
 
   # memory allocator for user data
   #   WARNING: This is NULL if data size equals zero.
@@ -372,6 +445,10 @@ mutable struct PXEST
     finalizer(pxest_destroy, this)
     return this
   end
+end
+
+function Base.length(pxest::PXEST)
+  return pxest.pxest.local_num_quadrants
 end
 
 function pxest_destroy(pxest)
@@ -428,6 +505,30 @@ struct pxest_iter_volume_info_t
   quad::Ptr{pxest_quadrant_t} # the quadrant of the callback
   quadid::pxest_locidx_t      # id in \a quad's tree array (see p4est_tree_t)
   treeid::pxest_topidx_t      # the tree containing \a quad
+end
+
+function quadX(volinfo::pxest_iter_volume_info_t)
+  quadX(unsafe_load(volinfo.quad))
+end
+function quadY(volinfo::pxest_iter_volume_info_t)
+  quadY(unsafe_load(volinfo.quad))
+end
+@p8est function quadZ(volinfo::pxest_iter_volume_info_t)
+  quadZ(unsafe_load(volinfo.quad))
+end
+function quadlevel(volinfo::pxest_iter_volume_info_t)
+  quadlevel(unsafe_load(volinfo.quad))
+end
+function quadlevel(volinfo::pxest_iter_volume_info_t)
+  volinfo.treeid
+end
+function quadLID(volinfo::pxest_iter_volume_info_t)
+  trees = unsafe_load(unsafe_load(volinfo.pxest).trees)
+  # FIXME: If this fails, then likely something wrong with the union in
+  # pxest_quadrant_t
+  @assert trees.elem_size == sizeof(pxest_tree_t)
+  tree  = unsafe_load(trees.array, volinfo.treeid+1)
+  tree.quadrants_offset + volinfo.quadid + 1
 end
 
 const pxest_iter_face_info_t = Cvoid
