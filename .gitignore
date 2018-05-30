@@ -13,6 +13,7 @@
 .\#*
 
 deps/p4est/
+deps/compile-time.jl
 
 *.pvtu
 *.visit
