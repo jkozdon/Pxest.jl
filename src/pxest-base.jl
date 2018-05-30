@@ -567,7 +567,7 @@ end
                          # edge, as in the definition of p8est_connectivity_t
   is_hanging::Int8       # boolean: one full quad (0) or two smaller quads (1)
   pxest_iter_edge_side_data::NTuple{PXEST_ITER_EDGE_SIDE_IS_SIZE, Cchar}
-  faces::Int8            # FIXME: Check that this is correct
+  faces::NTuple{2, Int8} # FIXME: Check that this is correct
 end
 
 @p8est struct pxest_iter_edge_info_t

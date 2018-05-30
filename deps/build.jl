@@ -46,7 +46,7 @@ struct pxest_iter_edge_side_t
   orientation::Int8      # the orientation of each quadrant relative to this
                          # edge, as in the definition of p8est_connectivity_t
   is_hanging::Int8       # boolean: one full quad (0) or two smaller quads (1)
-  faces::Int8            # FIXME: Check that this is correct
+  faces::NTuple{2, Int8} # FIXME: Check that this is correct
 end
 
 let
