@@ -12,7 +12,7 @@
 .DS_Store
 .\#*
 
-/p4est/
+deps/p4est/
 
 *.pvtu
 *.visit
