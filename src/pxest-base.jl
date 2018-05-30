@@ -41,6 +41,18 @@ const libpxest = joinpath(dirname(@__FILE__), "../deps/p4est/local/lib/libp4est.
       "p4est_julia_quadrant_p_piggy3_which_tree",
     :PXEST_JULIA_QUADRANT_P_PIGGY3_LOCAL_NUM  =>
       "p4est_julia_quadrant_p_piggy3_local_num",
+    :PXEST_JULIA_ITER_FACE_SIDE_T_IS_FULL_IS_GHOST =>
+      "p4est_julia_iter_face_side_t_is_full_is_ghost",
+    :PXEST_JULIA_ITER_FACE_SIDE_T_IS_FULL_QUAD =>
+      "p4est_julia_iter_face_side_t_is_full_quad",
+    :PXEST_JULIA_ITER_FACE_SIDE_T_IS_FULL_QUADID =>
+      "p4est_julia_iter_face_side_t_is_full_quadid",
+    :PXEST_JULIA_ITER_FACE_SIDE_T_IS_HANGING_IS_GHOST =>
+      "p4est_julia_iter_face_side_t_is_hanging_is_ghost",
+    :PXEST_JULIA_ITER_FACE_SIDE_T_IS_HANGING_QUAD =>
+      "p4est_julia_iter_face_side_t_is_hanging_quad",
+    :PXEST_JULIA_ITER_FACE_SIDE_T_IS_HANGING_QUADId =>
+      "p4est_julia_iter_face_side_t_is_hanging_quadid",
    )
 
 @p8est const _pxest_functions = Dict{Symbol, String}(
@@ -76,6 +88,18 @@ const libpxest = joinpath(dirname(@__FILE__), "../deps/p4est/local/lib/libp4est.
       "p8est_julia_quadrant_p_piggy3_which_tree",
     :PXEST_JULIA_QUADRANT_P_PIGGY3_LOCAL_NUM  =>
       "p8est_julia_quadrant_p_piggy3_local_num",
+    :PXEST_JULIA_ITER_FACE_SIDE_T_IS_FULL_IS_GHOST =>
+      "p8est_julia_iter_face_side_t_is_full_is_ghost",
+    :PXEST_JULIA_ITER_FACE_SIDE_T_IS_FULL_QUAD =>
+      "p8est_julia_iter_face_side_t_is_full_quad",
+    :PXEST_JULIA_ITER_FACE_SIDE_T_IS_FULL_QUADID =>
+      "p8est_julia_iter_face_side_t_is_full_quadid",
+    :PXEST_JULIA_ITER_FACE_SIDE_T_IS_HANGING_IS_GHOST =>
+      "p8est_julia_iter_face_side_t_is_hanging_is_ghost",
+    :PXEST_JULIA_ITER_FACE_SIDE_T_IS_HANGING_QUAD =>
+      "p8est_julia_iter_face_side_t_is_hanging_quad",
+    :PXEST_JULIA_ITER_FACE_SIDE_T_IS_HANGING_QUADId =>
+      "p8est_julia_iter_face_side_t_is_hanging_quadid",
    )
 
 # Build symbols
@@ -558,6 +582,22 @@ struct pxest_iter_face_info_t
   tree_boundary::Int8 # boolean: interior face (0), boundary face (1)
   # array of p4est_iter_face_side_t type
   sides::sc_array_t{pxest_iter_face_side_t}
+end
+function Base.length(face::pxest_iter_face_info_t)
+  face.sides.elem_count
+end
+function Base.getindex(face::pxest_iter_face_info_t, i)
+  @assert i == 1 || i == 2
+  unsafe_load(face.sides.array, i)
+end
+function sidetreeid(side::pxest_iter_face_side_t)
+  side.treeid
+end
+function sideface(side::pxest_iter_face_side_t)
+  side.face
+end
+function sideishanging(side::pxest_iter_face_side_t)
+  side.is_hanging
 end
 
 @p8est struct pxest_iter_edge_side_t

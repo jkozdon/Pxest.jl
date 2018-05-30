@@ -87,8 +87,15 @@ mutable struct Mesh
       MToE[Me] = UMToE[mirror_proc_mirrors[Me]+1]
     end
 
-
     faces(pxest) do face
+      if length(face) == 1
+        # Boundary
+        side1 = face[1]
+        println((sidetreeid(side1), sideface(side1), sideishanging(side1)))
+      else
+        side1 = face[1]
+        side2 = face[2]
+      end
     end
 
     mesh
