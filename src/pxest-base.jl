@@ -194,6 +194,10 @@ struct pxest_connectivity_t
   corner_to_corner::Ptr{Int8}
 end
 
+# Since no guarantee on GC order, we keep track of references to the
+# connectivity pointer and only free on the last reference
+const pxest_conn_ptr_refs = Dict{Ptr{pxest_connectivity_t}, Int}()
+
 function pxest_connectivity_read_inp(filename)
   ccall(PXEST_CONNECTIVITY_READ_INP, Ptr{pxest_connectivity_t},
         (Ptr{Cchar},), filename)
@@ -215,8 +219,13 @@ end
         (Cint, Cint, Cint, Cint, Cint, Cint), nx, ny, nz, px, py, pz)
 end
 
-function pxest_connectivity_destroy(conn)
-  ccall(PXEST_CONNECTIVITY_DESTROY, Cvoid, (Ptr{Cvoid},), conn)
+function pxest_connectivity_destroy(conn_ptr)
+  if pxest_conn_ptr_refs[conn_ptr] == 1
+    ccall(PXEST_CONNECTIVITY_DESTROY, Cvoid, (Ptr{Cvoid},), conn_ptr)
+    delete!(pxest_conn_ptr_refs, conn_ptr)
+  else
+    pxest_conn_ptr_refs[conn_ptr] -= 1
+  end
 end
 
 mutable struct Connectivity
@@ -257,6 +266,8 @@ mutable struct Connectivity
                                  (PXEST_CHILDREN, Int(num_trees)))
     this = new(num_vertices, num_trees, vertices, tree_to_vertex,
                pxest_conn_ptr)
+    @assert !haskey(pxest_conn_ptr_refs, pxest_conn_ptr)
+    pxest_conn_ptr_refs[pxest_conn_ptr] = 1
     finalizer(connectivity_destroy, this)
     return this
   end
@@ -441,6 +452,8 @@ mutable struct PXEST
           pxest, MPI.CComm(mpicomm), conn.pxest_conn_ptr, 0, min_lvl, 1, 0,
           C_NULL, C_NULL)
 
+    @assert haskey(pxest_conn_ptr_refs, conn.pxest_conn_ptr)
+    pxest_conn_ptr_refs[conn.pxest_conn_ptr] +=1
     this = new(pxest, conn, C_NULL)
     finalizer(pxest_destroy, this)
     return this
@@ -455,7 +468,9 @@ function pxest_destroy(pxest)
   if pxest.ghost != C_NULL
     ghost_destroy!(pxest)
   end
+  conn_ptr = pxest.pxest.connectivity
   ccall(PXEST_DESTROY_EXT, Cvoid, (Ref{pxest_t}, Cint), pxest.pxest, 0)
+  pxest_connectivity_destroy(conn_ptr)
 end
 
 function balance!(pxest; connect = PXEST_CONNECT_FULL)
@@ -493,7 +508,7 @@ function ghost!(pxest; connect = PXEST_CONNECT_FULL)
                       pxest.pxest, connect)
 end
 
-function ghost_destroy!(pxest; connect = PXEST_CONNECT_FULL)
+function ghost_destroy!(pxest)
   pxest.ghost != C_NULL || error("ghost is C_NULL")
   ccall(PXEST_GHOST_DESTROY, Cvoid, (Ptr{pxest_ghost_t},), pxest.ghost)
   pxest.ghost = C_NULL
@@ -576,7 +591,6 @@ function corners(pxest, corn_fn::Function)
 end
 
 @p4est function iterator(pxest, quad_fn, face_fn, corn_fn)
-  println(typeof(pxest))
   iterator_call(pxest,
                 quad_fn == C_NULL ? C_NULL : (x, y)->begin
                   quad_fn(x)
