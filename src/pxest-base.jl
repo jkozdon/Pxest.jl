@@ -1,6 +1,8 @@
 using MPI
 using Libdl
 
+include(joinpath(dirname(@__FILE__), "../deps/compile-time.jl"))
+
 # Path to the library
 const libsc = joinpath(dirname(@__FILE__), "../deps/p4est/local/lib/libsc.dylib")
 const libpxest = joinpath(dirname(@__FILE__), "../deps/p4est/local/lib/libp4est.dylib")
@@ -39,8 +41,6 @@ const libpxest = joinpath(dirname(@__FILE__), "../deps/p4est/local/lib/libp4est.
       "p4est_julia_quadrant_p_piggy3_which_tree",
     :PXEST_JULIA_QUADRANT_P_PIGGY3_LOCAL_NUM  =>
       "p4est_julia_quadrant_p_piggy3_local_num",
-    #TODO: Use this to set piggy size
-    :PXEST_JULIA_SIZEOF_QUADRANT_T    => "p4est_julia_sizeof_quadrant_t",
    )
 
 @p8est const _pxest_functions = Dict{Symbol, String}(
@@ -76,8 +76,6 @@ const libpxest = joinpath(dirname(@__FILE__), "../deps/p4est/local/lib/libp4est.
       "p8est_julia_quadrant_p_piggy3_which_tree",
     :PXEST_JULIA_QUADRANT_P_PIGGY3_LOCAL_NUM  =>
       "p8est_julia_quadrant_p_piggy3_local_num",
-    #TODO: Use this to set piggy size
-    :PXEST_JULIA_SIZEOF_QUADRANT_T    => "p8est_julia_sizeof_quadrant_t",
    )
 
 # Build symbols
@@ -99,6 +97,7 @@ end
 #{{{ p4est constants and types
 @p4est const PXEST_CHILDREN = 4
 @p8est const PXEST_CHILDREN = 8
+const PXEST_HALF = div(PXEST_CHILDREN, 2)
 @p4est const PXEST_MAXLEVEL = 30
 @p8est const PXEST_MAXLEVEL = 19
 const PXEST_ROOT_LEN = 1 << PXEST_MAXLEVEL
@@ -302,9 +301,7 @@ struct pxest_quadrant_t
   pad8::Int8     # padding
   pad16::Int16    # padding
 
-  # TODO: Figure out how to handle this better (How to cast?)
-  piggy_data::NTuple{piggy_size, Cchar}
-  @p4est dummy::pxest_qcoord_t # FIXME: Is this correct???
+  piggy_data::NTuple{PXEST_QUADRANT_PIGGY_SIZE, Cchar}
 end
 
 struct pxest_ghost_t
@@ -546,8 +543,41 @@ function quadLID(volinfo::pxest_iter_volume_info_t)
   tree.quadrants_offset + volinfo.quadid + 1
 end
 
-const pxest_iter_face_info_t = Cvoid
-@p8est const pxest_iter_edge_info_t = Cvoid
+struct pxest_iter_face_side_t
+  treeid::pxest_topidx_t # the tree on this side
+  face::Int8             # which quadrant side the face touches
+  is_hanging::Int8       # boolean: one full quad (0) or two smaller quads (1)
+  pxest_iter_face_side_data::NTuple{PXEST_ITER_FACE_SIDE_IS_SIZE, Cchar}
+end
+
+struct pxest_iter_face_info_t
+  pxest::Ptr{pxest_t}
+  ghost_layer::Ptr{pxest_ghost_t}
+  orientation::Int8   # the orientation of the sides to each other, as in the
+                      # definition of p8est_connectivity_t
+  tree_boundary::Int8 # boolean: interior face (0), boundary face (1)
+  # array of p4est_iter_face_side_t type
+  sides::sc_array_t{pxest_iter_face_side_t}
+end
+
+@p8est struct pxest_iter_edge_side_t
+  treeid::pxest_topidx_t # the tree on this side
+  edge::Int8             # which quadrant side the edge touches
+  orientation::Int8      # the orientation of each quadrant relative to this
+                         # edge, as in the definition of p8est_connectivity_t
+  is_hanging::Int8       # boolean: one full quad (0) or two smaller quads (1)
+  pxest_iter_edge_side_data::NTuple{PXEST_ITER_EDGE_SIDE_IS_SIZE, Cchar}
+  faces::Int8
+end
+
+@p8est struct pxest_iter_edge_info_t
+  pxest::Ptr{pxest_t}
+  ghost_layer::Ptr{pxest_ghost_t}
+  tree_boundary::Int8 # boolean: interior face (0), boundary face (1)
+  # array of p8est_iter_edge_side_t type
+  sides::sc_array_t{pxest_iter_edge_side_t}
+end
+
 const pxest_iter_corner_info_t = Cvoid
 
 function quad_fn_wrapper(pxest_ptr, (pxest, quad_fn))::Cvoid
