@@ -3,6 +3,8 @@ mutable struct Mesh
   Kintra::Int32
   Kuniqmirror::Int32
   Kmirror::Int32
+  Kghost::Int32
+  Ktotal::Int32 # Klocal + Kghost
   EToL ::Array{Int8 , 1} # element to p4est level
   EToT ::Array{Int32, 1} # element to p4est treeid
   EToX ::Array{Int32, 1} # element to p4est x-qcoord
@@ -48,10 +50,12 @@ mutable struct Mesh
     Kuniqmirror = mesh.Kuniqmirror = Int32(ghost.mirrors.elem_count)
     Kintra      = mesh.Kintra      = Int32(Klocal - Kuniqmirror)
     Kmirror     = mesh.Kmirror     = Int32(PToM[end] - 1)
+    Kghost      = mesh.Kghost      = Int32(ghost.ghosts.elem_count)
     @assert length(mirror_lid) == Kuniqmirror
+    Ktotal      = mesh.Ktotal      = Int32(Klocal + Kghost)
 
-    EToL = mesh.EToL = zeros(Int8, Klocal)
-    EToT = mesh.EToT = zeros(Int8, Klocal)
+    EToL = mesh.EToL = zeros(Int8,  Klocal)
+    EToT = mesh.EToT = zeros(Int8,  Klocal)
     EToX = mesh.EToX = zeros(Int32, Klocal)
     EToY = mesh.EToY = zeros(Int32, Klocal)
     EToZ = mesh.EToZ = zeros(Int32, Klocal)
@@ -87,11 +91,11 @@ mutable struct Mesh
       MToE[Me] = UMToE[mirror_proc_mirrors[Me]+1]
     end
 
-    EToB  = mesh.EToB = zeros(Cint, PXEST_FACES, Klocal)
-    EToE  = mesh.EToE = zeros(Cint, PXEST_FACES, Klocal)
-    EToF  = mesh.EToF = zeros(Cint, PXEST_FACES, Klocal)
-    EToO  = mesh.EToO = zeros(Cint, PXEST_FACES, Klocal)
-    #FIXME EToP  = mesh.EToP = zeros(Bool, PXEST_FACES, Klocal)
+    EToB  = mesh.EToB = zeros(Cint, PXEST_FACES, Ktotal)
+    EToE  = mesh.EToE = zeros(Cint, PXEST_FACES, Ktotal)
+    EToF  = mesh.EToF = zeros(Cint, PXEST_FACES, Ktotal)
+    EToO  = mesh.EToO = zeros(Cint, PXEST_FACES, Ktotal)
+    #FIXME EToP  = mesh.EToP = zeros(Bool, PXEST_FACES, Ktotal or Klocal)
     faces(pxest) do face
       if length(face) == 1
         # Boundary
@@ -129,7 +133,6 @@ mutable struct Mesh
             (t2,) = sidetreeid(side2)
             e2 = pxest[q2, t2]
           else
-            println(q2)
             e2 = q2 + Klocal
           end
 
