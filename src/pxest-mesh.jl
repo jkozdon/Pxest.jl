@@ -140,13 +140,13 @@ mutable struct Mesh
           EToE[f1, e1] = e2
           EToF[f1, e1] = f2
           EToO[f1, e1] = o2 # FIXME
-          #FIXME EToP[f1, e1] = 
+          #FIXME EToP[f1, e1] =
 
           EToB[f2, e2] = -1
           EToE[f2, e2] = e1
           EToF[f2, e2] = f1
           EToO[f2, e2] = o1 # FIXME
-          #FIXME EToP[f2, e2] = 
+          #FIXME EToP[f2, e2] =
 
         else # hanging face
           # make sure side2 is the hanging face
