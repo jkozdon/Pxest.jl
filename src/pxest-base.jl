@@ -820,7 +820,7 @@ function iterator_call(pxest, quad_fn, face_fn, edge_fn, corn_fn, ghost=C_NULL)
   @p8est ccall(PXEST_ITERATE, Cvoid, (Ref{pxest_t}, Ptr{pxest_ghost_t},
                                       Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cvoid},
                                       Ptr{Cvoid}, Ptr{Cvoid}),
-               pxest.pxest, C_NULL, C_NULL, quad_fn_ptr, face_fn_ptr,
+               pxest.pxest, ghost, C_NULL, quad_fn_ptr, face_fn_ptr,
                edge_fn_ptr, corn_fn_ptr)
 end
 
