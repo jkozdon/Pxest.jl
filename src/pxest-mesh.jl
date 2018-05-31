@@ -1,5 +1,5 @@
 mutable struct Mesh
-  K::Int32
+  Klocal::Int32
   Kintra::Int32
   Kuniqmirror::Int32
   Kmirror::Int32
@@ -17,9 +17,9 @@ mutable struct Mesh
   EToE ::Array{Cint , 2} # element to neighbor element
   EToF ::Array{Cint , 2} # element to neighbor face
   EToO ::Array{Cint , 2} # element to neighbor orientation
-  EToP ::Array{Cint , 2} # element to periodicity mask (filled only for brick)
+  #FIXME EToP ::Array{Bool , 2} # element to periodicity mask (filled only for brick)
 
-  function Mesh(pxest)
+  function Mesh(pxest; default_bc=1)
     mesh = new()
 
     ghost = unsafe_load(pxest.ghost)
@@ -44,17 +44,17 @@ mutable struct Mesh
       PToM[p] = mirror_proc_offsets[p] + 1
     end
 
-    K           = mesh.K           = Int32(length(pxest))
+    Klocal      = mesh.Klocal      = Int32(length(pxest))
     Kuniqmirror = mesh.Kuniqmirror = Int32(ghost.mirrors.elem_count)
-    Kintra      = mesh.Kintra      = Int32(K - Kuniqmirror)
+    Kintra      = mesh.Kintra      = Int32(Klocal - Kuniqmirror)
     Kmirror     = mesh.Kmirror     = Int32(PToM[end] - 1)
     @assert length(mirror_lid) == Kuniqmirror
 
-    EToL = mesh.EToL = zeros(Int8, K)
-    EToT = mesh.EToT = zeros(Int8, K)
-    EToX = mesh.EToX = zeros(Int32, K)
-    EToY = mesh.EToY = zeros(Int32, K)
-    EToZ = mesh.EToZ = zeros(Int32, K)
+    EToL = mesh.EToL = zeros(Int8, Klocal)
+    EToT = mesh.EToT = zeros(Int8, Klocal)
+    EToX = mesh.EToX = zeros(Int32, Klocal)
+    EToY = mesh.EToY = zeros(Int32, Klocal)
+    EToZ = mesh.EToZ = zeros(Int32, Klocal)
 
     IToE  = mesh.IToE  = zeros(Int32, Kintra)
     UMToE = mesh.UMToE = zeros(Int32, Kuniqmirror)
@@ -87,14 +87,69 @@ mutable struct Mesh
       MToE[Me] = UMToE[mirror_proc_mirrors[Me]+1]
     end
 
+    EToB  = mesh.EToB = zeros(Cint, PXEST_FACES, Klocal)
+    EToE  = mesh.EToE = zeros(Cint, PXEST_FACES, Klocal)
+    EToF  = mesh.EToF = zeros(Cint, PXEST_FACES, Klocal)
+    EToO  = mesh.EToO = zeros(Cint, PXEST_FACES, Klocal)
+    #FIXME EToP  = mesh.EToP = zeros(Bool, PXEST_FACES, Klocal)
     faces(pxest) do face
       if length(face) == 1
         # Boundary
         side1 = face[1]
-        println((sidetreeid(side1), sideface(side1), sideishanging(side1)))
+        f = sideface(side1)
+        tid = sidetreeid(side1)
+        (qid,) = sidequadid(side1)
+        elm = pxest[qid, tid]
+        EToB[f, elm] = default_bc
+        EToE[f, elm] = elm
+        EToF[f, elm] = f
+        EToO[f, elm] = 0
+        #FIXME EToP[f, elm] = false
       else
         side1 = face[1]
         side2 = face[2]
+        o1 = o2 = faceorientation(face) # FIXME
+        if !sideishanging(side1) && !sideishanging(side2)
+          # Full Face
+          (f1,) = sideface(side1)
+          (g1,) = sideisghost(side1)
+          (q1,) = sidequadid(side1)
+          if !g1
+            (t1,) = sidetreeid(side1)
+            e1 = pxest[q1, t1]
+          else
+            e1 = q1 + Klocal
+          end
+
+          # Full Face
+          (f2,) = sideface(side2)
+          (g2,) = sideisghost(side2)
+          (q2,) = sidequadid(side2)
+          if !g2
+            (t2,) = sidetreeid(side2)
+            e2 = pxest[q2, t2]
+          else
+            println(q2)
+            e2 = q2 + Klocal
+          end
+
+          EToB[f1, e1] = -1
+          EToE[f1, e1] = e2
+          EToF[f1, e1] = f2
+          EToO[f1, e1] = o2 # FIXME
+          #FIXME EToP[f1, e1] = 
+
+          EToB[f2, e2] = -1
+          EToE[f2, e2] = e1
+          EToF[f2, e2] = f1
+          EToO[f2, e2] = o1 # FIXME
+          #FIXME EToP[f2, e2] = 
+
+        else # hanging face
+          # make sure side2 is the hanging face
+          sideishanging(side1) && ((side1, side2) = (side2, side1))
+          @assert !sideishanging(side1) && sideishanging(side2)
+        end
       end
     end
 

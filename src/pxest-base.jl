@@ -51,7 +51,7 @@ const libpxest = joinpath(dirname(@__FILE__), "../deps/p4est/local/lib/libp4est.
       "p4est_julia_iter_face_side_t_is_hanging_is_ghost",
     :PXEST_JULIA_ITER_FACE_SIDE_T_IS_HANGING_QUAD =>
       "p4est_julia_iter_face_side_t_is_hanging_quad",
-    :PXEST_JULIA_ITER_FACE_SIDE_T_IS_HANGING_QUADId =>
+    :PXEST_JULIA_ITER_FACE_SIDE_T_IS_HANGING_QUADID =>
       "p4est_julia_iter_face_side_t_is_hanging_quadid",
    )
 
@@ -98,7 +98,7 @@ const libpxest = joinpath(dirname(@__FILE__), "../deps/p4est/local/lib/libp4est.
       "p8est_julia_iter_face_side_t_is_hanging_is_ghost",
     :PXEST_JULIA_ITER_FACE_SIDE_T_IS_HANGING_QUAD =>
       "p8est_julia_iter_face_side_t_is_hanging_quad",
-    :PXEST_JULIA_ITER_FACE_SIDE_T_IS_HANGING_QUADId =>
+    :PXEST_JULIA_ITER_FACE_SIDE_T_IS_HANGING_QUADID =>
       "p8est_julia_iter_face_side_t_is_hanging_quadid",
    )
 
@@ -125,6 +125,8 @@ const PXEST_HALF = div(PXEST_CHILDREN, 2)
 @p4est const PXEST_MAXLEVEL = 30
 @p8est const PXEST_MAXLEVEL = 19
 const PXEST_ROOT_LEN = 1 << PXEST_MAXLEVEL
+@p4est const PXEST_FACES = 4
+@p8est const PXEST_FACES = 6
 
 struct sc_array_t{T}
   # interface variables
@@ -460,6 +462,19 @@ mutable struct pxest_t
   end
 end
 
+function Base.getindex(pxest::pxest_t, quadid, treeid)
+  trees = unsafe_load(pxest.trees)
+  # FIXME: If this fails, then likely something wrong with the union in
+  # pxest_quadrant_t
+  @assert trees.elem_size == sizeof(pxest_tree_t)
+  tree  = unsafe_load(trees.array, treeid)
+  tree.quadrants_offset + quadid
+end
+function Base.getindex(pxest_ptr::Ptr{pxest_t}, quadid, treeid)
+  pxest = unsafe_load(pxest_ptr)
+  pxest[quadid, treeid]
+end
+
 mutable struct PXEST
   pxest::pxest_t
   conn::Connectivity
@@ -483,6 +498,9 @@ end
 
 function Base.length(pxest::PXEST)
   return pxest.pxest.local_num_quadrants
+end
+function Base.getindex(pxest::PXEST, quadid, treeid)
+  pxest.pxest[quadid, treeid]
 end
 
 function pxest_destroy(pxest)
@@ -559,12 +577,7 @@ function quadlevel(volinfo::pxest_iter_volume_info_t)
   volinfo.treeid
 end
 function quadLID(volinfo::pxest_iter_volume_info_t)
-  trees = unsafe_load(unsafe_load(volinfo.pxest).trees)
-  # FIXME: If this fails, then likely something wrong with the union in
-  # pxest_quadrant_t
-  @assert trees.elem_size == sizeof(pxest_tree_t)
-  tree  = unsafe_load(trees.array, volinfo.treeid+1)
-  tree.quadrants_offset + volinfo.quadid + 1
+  volinfo.pxest[volinfo.quadid+1, volinfo.treeid+1]
 end
 
 struct pxest_iter_face_side_t
@@ -591,13 +604,82 @@ function Base.getindex(face::pxest_iter_face_info_t, i)
   unsafe_load(face.sides.array, i)
 end
 function sidetreeid(side::pxest_iter_face_side_t)
-  side.treeid
+  side.treeid+1
 end
 function sideface(side::pxest_iter_face_side_t)
-  side.face
+  side.face+1
 end
 function sideishanging(side::pxest_iter_face_side_t)
-  side.is_hanging
+  side.is_hanging!=0
+end
+function faceorientation(face::pxest_iter_face_info_t)
+  face.orientation
+end
+function sideisghost(side::pxest_iter_face_side_t) :: NTuple{PXEST_HALF, Bool}
+  if side.is_hanging != 0
+    g0 = ccall(PXEST_JULIA_ITER_FACE_SIDE_T_IS_HANGING_IS_GHOST, Int8,
+               (Ref{pxest_iter_face_side_t}, Int), side, 0)
+    g1 = ccall(PXEST_JULIA_ITER_FACE_SIDE_T_IS_HANGING_IS_GHOST, Int8,
+               (Ref{pxest_iter_face_side_t}, Int), side, 1)
+    @p4est return (g0==1, g1==1)
+    @p8est g2 = ccall(PXEST_JULIA_ITER_FACE_SIDE_T_IS_HANGING_IS_GHOST, Int8,
+                      (Ref{pxest_iter_face_side_t}, Int), side, 2)
+    @p8est g3 = ccall(PXEST_JULIA_ITER_FACE_SIDE_T_IS_HANGING_IS_GHOST, Int8,
+                      (Ref{pxest_iter_face_side_t}, Int), side, 3)
+    @p8est return (g0==1, g1==1, g2==1, g3==1)
+  else
+    g = ccall(PXEST_JULIA_ITER_FACE_SIDE_T_IS_FULL_IS_GHOST, Int8,
+              (Ref{pxest_iter_face_side_t},), side)
+    @p4est return (g==1, false)
+    @p8est return (g==1, false, false, false)
+  end
+end
+
+function sidequadid(side::pxest_iter_face_side_t) :: NTuple{PXEST_HALF,
+                                                            pxest_locidx_t}
+  if side.is_hanging != 0
+    q0 = ccall(PXEST_JULIA_ITER_FACE_SIDE_T_IS_HANGING_QUADID, pxest_locidx_t,
+               (Ref{pxest_iter_face_side_t}, Int), side, 0)
+    q1 = ccall(PXEST_JULIA_ITER_FACE_SIDE_T_IS_HANGING_QUADID, pxest_locidx_t,
+               (Ref{pxest_iter_face_side_t}, Int), side, 1)
+    @p4est return (q0+1, q1+1)
+    @p8est q2 = ccall(PXEST_JULIA_ITER_FACE_SIDE_T_IS_HANGING_QUADID,
+                      pxest_locidx_t,
+                      (Ref{pxest_iter_face_side_t}, Int), side, 2)
+    @p8est q3 = ccall(PXEST_JULIA_ITER_FACE_SIDE_T_IS_HANGING_QUADID,
+                      pxest_locidx_t,
+                      (Ref{pxest_iter_face_side_t}, Int), side, 3)
+    @p8est return (q0+1, q1+1, q2+1, q3+1)
+  else
+    q = ccall(PXEST_JULIA_ITER_FACE_SIDE_T_IS_FULL_QUADID, pxest_locidx_t,
+              (Ref{pxest_iter_face_side_t},), side)
+    @p4est return (q+1, 0)
+    @p8est return (q+1, 0, 0, 0)
+  end
+end
+function sidequad(side::pxest_iter_face_side_t) :: NTuple{PXEST_HALF,
+                                                          pxest_quadrant_t}
+  if side.is_hanging != 0
+    q0 = ccall(PXEST_JULIA_ITER_FACE_SIDE_T_IS_HANGING_QUAD,
+               Ptr{pxest_quadrant_t},
+               (Ref{pxest_iter_face_side_t}, Int), side, 0)
+    q1 = ccall(PXEST_JULIA_ITER_FACE_SIDE_T_IS_HANGING_QUAD,
+               Ptr{pxest_quadrant_t},
+               (Ref{pxest_iter_face_side_t}, Int), side, 1)
+    @p4est return (q0, q1)
+    @p8est q2 = ccall(PXEST_JULIA_ITER_FACE_SIDE_T_IS_HANGING_QUAD,
+                      Ptr{pxest_quadrant_t},
+                      (Ref{pxest_iter_face_side_t}, Int), side, 2)
+    @p8est q3 = ccall(PXEST_JULIA_ITER_FACE_SIDE_T_IS_HANGING_QUAD,
+                      Ptr{pxest_quadrant_t},
+                      (Ref{pxest_iter_face_side_t}, Int), side, 3)
+    @p8est return (q0, q1, q2, q3)
+  else
+    q = ccall(PXEST_JULIA_ITER_FACE_SIDE_T_IS_FULL_QUAD, Ptr{pxest_quadrant_t},
+              (Ref{pxest_iter_face_side_t},), side)
+    @p4est return (q, 0)
+    @p8est return (q, 0, 0, 0)
+  end
 end
 
 @p8est struct pxest_iter_edge_side_t
@@ -635,12 +717,17 @@ function quadrants(pxest, quad_fn::Function)
 end
 
 function faces(face_fn::Function, pxest)
-  faces(pxest, face_fn)
+  faces(pxest, face_fn, pxest.ghost)
 end
 
 function faces(pxest, face_fn::Function)
-  @p8est iterator(pxest, C_NULL, face_fn, C_NULL, C_NULL)
-  @p4est iterator(pxest, C_NULL, face_fn, C_NULL)
+  faces(pxest, face_fn, pxest.ghost)
+end
+
+
+function faces(pxest, face_fn::Function, ghost)
+  @p8est iterator(pxest, C_NULL, face_fn, C_NULL, C_NULL, ghost)
+  @p4est iterator(pxest, C_NULL, face_fn, C_NULL, ghost)
 end
 
 @p8est function edges(edge_fn::Function, pxest)
@@ -660,7 +747,7 @@ function corners(pxest, corn_fn::Function)
   @p4est iterator(pxest, C_NULL, C_NULL, corn_fn)
 end
 
-@p4est function iterator(pxest, quad_fn, face_fn, corn_fn)
+@p4est function iterator(pxest, quad_fn, face_fn, corn_fn, ghost=C_NULL)
   iterator_call(pxest,
                 quad_fn == C_NULL ? C_NULL : (x, y)->begin
                   quad_fn(x)
@@ -674,10 +761,11 @@ end
                 corn_fn == C_NULL ? C_NULL : (x, y)->begin
                   corn_fn(x)
                   nothing
-                end)
+                end, ghost)
 end
 
-@p8est function iterator(pxest, quad_fn, face_fn, edge_fn, corn_fn)
+@p8est function iterator(pxest, quad_fn, face_fn, edge_fn, corn_fn,
+                         ghost=C_NULL)
   iterator_call(pxest,
                 quad_fn == C_NULL ? C_NULL : (x, y)->begin
                   quad_fn(x)
@@ -694,10 +782,10 @@ end
                 corn_fn == C_NULL ? C_NULL : (x, y)->begin
                   corn_fn(x)
                   nothing
-                end)
+                end, ghost)
 end
 
-function iterator_call(pxest, quad_fn, face_fn, edge_fn, corn_fn)
+function iterator_call(pxest, quad_fn, face_fn, edge_fn, corn_fn, ghost=C_NULL)
   if quad_fn != C_NULL
     quad_fn_ptr = @cfunction($quad_fn, Cvoid, (Ref{pxest_iter_volume_info_t},
                                                Ptr{Cvoid}))
@@ -726,7 +814,7 @@ function iterator_call(pxest, quad_fn, face_fn, edge_fn, corn_fn)
   @p4est ccall(PXEST_ITERATE, Cvoid, (Ref{pxest_t}, Ptr{pxest_ghost_t},
                                       Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cvoid},
                                       Ptr{Cvoid}),
-               pxest.pxest, C_NULL, C_NULL, quad_fn_ptr, face_fn_ptr,
+               pxest.pxest, ghost, C_NULL, quad_fn_ptr, face_fn_ptr,
                corn_fn_ptr)
 
   @p8est ccall(PXEST_ITERATE, Cvoid, (Ref{pxest_t}, Ptr{pxest_ghost_t},
