@@ -25,6 +25,7 @@ let
   p4est.balance!(pxest)
   p4est.partition!(pxest)
   p4est.ghost!(pxest)
+  p4est.lnodes!(pxest, 2)
   mesh = p4est.Mesh(pxest)
 
   # dump VTK
@@ -89,6 +90,7 @@ let
   p8est.balance!(pxest)
   p8est.partition!(pxest)
   p8est.ghost!(pxest)
+  p8est.lnodes!(pxest, 2)
   mesh = p8est.Mesh(pxest)
 
   # dump VTK

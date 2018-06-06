@@ -19,6 +19,9 @@ const libpxest = joinpath(dirname(@__FILE__), "../deps/p4est/local/lib/libp4est.
     :PXEST_PARTITION                  => "p4est_partition",
     :PXEST_GHOST_NEW                  => "p4est_ghost_new",
     :PXEST_GHOST_DESTROY              => "p4est_ghost_destroy",
+    :PXEST_LNODES_NEW                 => "p4est_lnodes_new",
+    :PXEST_LNODES_DESTROY             => "p4est_lnodes_destroy",
+    :PXEST_GHOST_SUPPORT_LNODES       => "p4est_ghost_support_lnodes",
     :PXEST_REFINE_EXT                 => "p4est_refine_ext",
     :PXEST_VTK_CONTEXT_NEW            => "p4est_vtk_context_new",
     :PXEST_VTK_CONTEXT_SET_SCALE      => "p4est_vtk_context_set_scale",
@@ -66,6 +69,9 @@ const libpxest = joinpath(dirname(@__FILE__), "../deps/p4est/local/lib/libp4est.
     :PXEST_PARTITION                  => "p8est_partition",
     :PXEST_GHOST_NEW                  => "p8est_ghost_new",
     :PXEST_GHOST_DESTROY              => "p8est_ghost_destroy",
+    :PXEST_LNODES_NEW                 => "p8est_lnodes_new",
+    :PXEST_LNODES_DESTROY             => "p8est_lnodes_destroy",
+    :PXEST_GHOST_SUPPORT_LNODES       => "p8est_ghost_support_lnodes",
     :PXEST_REFINE_EXT                 => "p8est_refine_ext",
     :PXEST_VTK_CONTEXT_NEW            => "p8est_vtk_context_new",
     :PXEST_VTK_CONTEXT_SET_SCALE      => "p8est_vtk_context_set_scale",
@@ -330,6 +336,33 @@ struct pxest_quadrant_t
   piggy_data::NTuple{PXEST_QUADRANT_PIGGY_SIZE, Cchar}
 end
 
+@p4est const pxest_lnodes_code_t = Int8
+@p8est const pxest_lnodes_code_t = Int16
+struct pxest_lnodes_rank_t
+  rank::Cint
+  shared_nodes::sc_array_t{pxest_locidx_t}
+  shared_mine_offset::pxest_locidx_t
+  shared_mine_count::pxest_locidx_t
+  owned_offset::pxest_locidx_t
+  owned_count::pxest_locidx_t
+end
+
+struct pxest_lnodes_t
+  mpicomm::MPI.CComm
+  num_local_nodes::pxest_locidx_t
+  owned_count::pxest_locidx_t
+  global_offset::pxest_gloidx_t
+  nonlocal_nodes::Ptr{pxest_gloidx_t}
+  sharers::Ptr{sc_array_t{pxest_lnodes_rank_t}}
+  global_owned_count::Ptr{pxest_locidx_t}
+
+  degree::Cint
+  vnodes::Cint
+  num_local_elements::pxest_locidx_t
+  face_code::Ptr{pxest_lnodes_code_t}
+  element_nodes::Ptr{pxest_locidx_t}
+end
+
 struct pxest_ghost_t
   mpisize::Cint
   num_trees::pxest_topidx_t
@@ -479,6 +512,7 @@ mutable struct PXEST
   pxest::pxest_t
   conn::Connectivity
   ghost::Ptr{pxest_ghost_t}
+  lnodes::Ptr{pxest_ghost_t}
 
   function PXEST(conn ;mpicomm=MPI.COMM_WORLD, min_lvl = 0)
     pxest = pxest_t()
@@ -490,7 +524,7 @@ mutable struct PXEST
 
     @assert haskey(pxest_conn_ptr_refs, conn.pxest_conn_ptr)
     pxest_conn_ptr_refs[conn.pxest_conn_ptr] +=1
-    this = new(pxest, conn, C_NULL)
+    this = new(pxest, conn, C_NULL, C_NULL)
     finalizer(pxest_destroy, this)
     return this
   end
@@ -506,6 +540,9 @@ end
 function pxest_destroy(pxest)
   if pxest.ghost != C_NULL
     ghost_destroy!(pxest)
+  end
+  if pxest.lnodes != C_NULL
+    lnodes_destroy!(pxest)
   end
   conn_ptr = pxest.pxest.connectivity
   ccall(PXEST_DESTROY_EXT, Cvoid, (Ref{pxest_t}, Cint), pxest.pxest, 0)
@@ -547,10 +584,32 @@ function ghost!(pxest; connect = PXEST_CONNECT_FULL)
                       pxest.pxest, connect)
 end
 
+function lnodes!(pxest, degree)
+  pxest.lnodes == C_NULL || error("lnodes is not C_NULL")
+  pxest.ghost  != C_NULL ||
+   error("ghost is C_NULL (ghost must be set before lnodes! is called")
+
+   # set up lnodes
+  pxest.lnodes = ccall(PXEST_LNODES_NEW, Ptr{pxest_lnodes_t},
+                       (Ref{pxest_t}, Ptr{pxest_ghost_t}, Cint),
+                      pxest.pxest, pxest.ghost, degree)
+
+  # expand ghost to include lnodes
+  ccall(PXEST_GHOST_SUPPORT_LNODES, Cvoid,
+        (Ref{pxest_t}, Ptr{pxest_lnodes_t}, Ptr{pxest_ghost_t}),
+        pxest.pxest, pxest.lnodes, pxest.ghost)
+end
+
 function ghost_destroy!(pxest)
   pxest.ghost != C_NULL || error("ghost is C_NULL")
   ccall(PXEST_GHOST_DESTROY, Cvoid, (Ptr{pxest_ghost_t},), pxest.ghost)
   pxest.ghost = C_NULL
+end
+
+function lnodes_destroy!(pxest)
+  pxest.lnodes != C_NULL || error("lnodes is C_NULL")
+  ccall(PXEST_LNODES_DESTROY, Cvoid, (Ptr{pxest_lnodes_t},), pxest.lnodes)
+  pxest.lnodes = C_NULL
 end
 
 struct pxest_iter_volume_info_t
