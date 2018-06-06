@@ -512,7 +512,7 @@ mutable struct PXEST
   pxest::pxest_t
   conn::Connectivity
   ghost::Ptr{pxest_ghost_t}
-  lnodes::Ptr{pxest_ghost_t}
+  lnodes::Ptr{pxest_lnodes_t}
 
   function PXEST(conn ;mpicomm=MPI.COMM_WORLD, min_lvl = 0)
     pxest = pxest_t()
