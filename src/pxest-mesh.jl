@@ -21,6 +21,10 @@ mutable struct Mesh
   EToO ::Array{Cint , 2} # element to neighbor orientation
   #FIXME EToP ::Array{Bool , 2} # element to periodicity mask (filled only for brick)
 
+  EToFC :: Array{Cint, 1} # element to p4est face code
+  CToD_starts::Array{Cint, 1}  # start indices for each continuous node
+  CToD_indices::Array{Cint, 1} # indices for continuous to discontinuous map
+
   function Mesh(pxest; default_bc=1)
     mesh = new()
 
@@ -54,6 +58,7 @@ mutable struct Mesh
     @assert length(mirror_lid) == Kuniqmirror
     Ktotal      = mesh.Ktotal      = Int32(Klocal + Kghost)
 
+    # elememt info
     EToL = mesh.EToL = zeros(Int8,  Klocal)
     EToT = mesh.EToT = zeros(Int8,  Klocal)
     EToX = mesh.EToX = zeros(Int32, Klocal)
@@ -91,6 +96,7 @@ mutable struct Mesh
       MToE[Me] = UMToE[mirror_proc_mirrors[Me]+1]
     end
 
+    # Element to Element connectivity info
     EToB  = mesh.EToB = zeros(Cint, PXEST_FACES, Ktotal)
     EToE  = mesh.EToE = zeros(Cint, PXEST_FACES, Ktotal)
     EToF  = mesh.EToF = zeros(Cint, PXEST_FACES, Ktotal)
@@ -154,6 +160,37 @@ mutable struct Mesh
           @assert !sideishanging(side1) && sideishanging(side2)
         end
       end
+    end
+
+    # Continuous to discontinuous info
+    if pxest.lnodes != C_NULL
+      lnodes = unsafe_load(pxest.lnodes)
+      EToFC = mesh.EToFC = zeros(Cint, Ktotal)
+
+      #{{{ Based on p4est_plex.c
+      let
+        # Get the face_code for each element
+        for e = 1:Klocal
+          EToFC[e] = unsafe_load(lnodes.face_code, e)
+        end
+
+        # Copy the face codes to a mirror array to send out to ghosts (note we
+        # copy the address of the data to send not the data itself!)
+        mirror_EToFC = Array{Ptr{Cint}}(undef, Kuniqmirror)
+        for m = 1:Kuniqmirror
+          mirror_EToFC[m] = pointer(EToFC, UMToE[m])
+        end
+
+        # Send the data out from the mirror array to the ghosts
+        ccall(PXEST_GHOST_EXCHANGE_CUSTOM, Cvoid,
+              (Ref{pxest_t}, Ptr{pxest_ghost_t}, Csize_t, Ref{Ptr{Cint}},
+               Ptr{Cint}),
+              pxest.pxest, pxest.ghost, sizeof(Cint), mirror_EToFC,
+              pointer(EToFC, Klocal))
+      end
+      #}}}
+
+      ## TODO: FINISH THIS!
     end
 
     mesh
