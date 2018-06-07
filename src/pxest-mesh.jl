@@ -24,6 +24,7 @@ mutable struct Mesh
   EToFC :: Array{Cint, 1} # element to p4est face code
   CToD_starts::Array{Cint, 1}  # start indices for each continuous node
   CToD_indices::Array{Cint, 1} # indices for continuous to discontinuous map
+  DToC::Array{Int64, 2}  # start indices for each continuous node
 
   function Mesh(pxest; default_bc=1)
     mesh = new()
@@ -167,7 +168,7 @@ mutable struct Mesh
       lnodes = unsafe_load(pxest.lnodes)
       EToFC = mesh.EToFC = zeros(Cint, Ktotal)
 
-      #{{{ Based on p4est_plex.c
+      #{{{ Get EToFc (based on p4est_plex.c)
       let
         # Get the face_code for each element
         for e = 1:Klocal
@@ -187,6 +188,40 @@ mutable struct Mesh
                Ptr{Cint}),
               pxest.pxest, pxest.ghost, sizeof(Cint), mirror_EToFC,
               pointer(EToFC, Klocal))
+      end
+      #}}}
+
+      Np = lnodes.vnodes
+      DToC = mesh.DToC = zeros(Int64, Np, Ktotal)
+      owned_count = lnodes.owned_count
+      global_offset = lnodes.global_offset
+      println(global_offset)
+      #{{{ Get DtoC (based on p4est_plex.c)
+      let
+        # For all the local elements, get their nodes global continuous node
+        # number
+        for n = 1:(Np * Klocal)
+          lidx = unsafe_load(lnodes.element_nodes, n) + 1
+          DToC[n] = (lidx <= owned_count) ? (lidx + global_offset) :
+          unsafe_load(lnodes.nonlocal_nodes, lidx - owned_count)
+        end
+
+        # Copy the discontinuous to continuous for my local elements to the
+        # mirror out to ghosts. We will copy all of an elements numbers, so we
+        # only copy the starting address for each element (since we copy the
+        # address of the data to send not the data itself!)
+        mirror_DToC = Array{Ptr{Int64}}(undef, Kuniqmirror)
+        for m = 1:Kuniqmirror
+          mirror_DToC[m] = pointer(DToC, (UMToE[m]-1) * Np + 1)
+        end
+
+        # Send the data out from the mirror array to the ghosts (i.e., figure
+        # out my neighbors DToC map)
+        ccall(PXEST_GHOST_EXCHANGE_CUSTOM, Cvoid,
+              (Ref{pxest_t}, Ptr{pxest_ghost_t}, Csize_t, Ref{Ptr{Int64}},
+               Ptr{Int64}),
+              pxest.pxest, pxest.ghost, Np * sizeof(Int64), mirror_DToC,
+              pointer(DToC, Klocal * Np + 1))
       end
       #}}}
 
