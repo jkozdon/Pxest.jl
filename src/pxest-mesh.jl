@@ -195,7 +195,6 @@ mutable struct Mesh
       DToC = mesh.DToC = zeros(Int64, Np, Ktotal)
       owned_count = lnodes.owned_count
       global_offset = lnodes.global_offset
-      println(global_offset)
       #{{{ Get DtoC (based on p4est_plex.c)
       let
         # For all the local elements, get their nodes global continuous node
@@ -222,6 +221,41 @@ mutable struct Mesh
                Ptr{Int64}),
               pxest.pxest, pxest.ghost, Np * sizeof(Int64), mirror_DToC,
               pointer(DToC, Klocal * Np + 1))
+      end
+      #}}}
+
+      CToD = Dict{Tuple{Int64, Int8, Cint, Int32, Int32}, Int32}()
+
+      # storage to mark that we have a continuous node locally
+      hasC = Dict{Int64, Bool}()
+
+      #{{{ Fill CToD Dictionary for local elements
+      hanging = zeros(Int8, Np)
+      for e = 1:Klocal
+        # TODO: gethanging!(hanging, EToC[e])
+        for n = 1:Np
+          CToD[(DToC[n, e], hanging[n], pxest.pxest.mpirank, e, n)] = Np * (e-1) + n
+          hasC[DToC[n, e]] = true
+        end
+      end
+      #}}}
+
+      #{{{ Fill CToD Dictionary for ghost
+      let
+        st = en = unsafe_load(ghost.proc_offsets, 1)+1
+        # Go through all the ranks and grab the ghost elements they have
+        for grank = 1:pxest.pxest.mpisize
+          # my start is my neighbors en
+          (st, en) = (en, unsafe_load(ghost.proc_offsets, grank+1)+1)
+          for g = st:en-1
+            # TODO: gethanging!(hanging, EToC[Klocal + g])
+            for n = 1:Np
+              if haskey(hasC, DToC[n, g])
+                CToD[(DToC[n, g], hanging[n], grank, g, n)] = Np * (g-1) + n
+              end
+            end
+          end
+        end
       end
       #}}}
 
